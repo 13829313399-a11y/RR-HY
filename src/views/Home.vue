@@ -231,6 +231,9 @@ function openTool(tool) {
 .card.disabled:hover .card-icon {
   transform: none;
 }
+.card.disabled:active {
+  transform: none;
+}
 
 /* 统计占位卡（小程序数据预留） */
 .stats {
@@ -291,6 +294,9 @@ function openTool(tool) {
   .topbar:hover :deep(.rr) {
     transition: color 0.2s, background 0.2s, box-shadow 0.2s;
     transform: none !important;
+  }
+  .nav span::after {
+    transition: none;
   }
 }
 </style>
