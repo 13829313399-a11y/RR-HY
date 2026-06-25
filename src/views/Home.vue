@@ -126,7 +126,7 @@ function openTool(tool) {
 }
 .hero h1 {
   font-size: 22px;
-  color: #065f46;
+  color: var(--ink-strong);
   margin: 0 0 6px;
 }
 .hero p {
@@ -209,7 +209,7 @@ function openTool(tool) {
   border-radius: 10px;
   font-weight: 600;
   background: var(--brand-tint);
-  color: var(--off);
+  color: #3f5e54;
 }
 .card-status.on {
   background: var(--ok);
