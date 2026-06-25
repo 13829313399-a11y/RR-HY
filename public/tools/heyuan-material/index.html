@@ -1,0 +1,2713 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>河源送印尼物料填单工具</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+  body { font-family: 'Microsoft YaHei', Arial, sans-serif; background: #f0f4f8; }
+  .step-nav { display: flex; align-items: center; }
+  .step-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+  .step-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; transition: all 0.2s; }
+  .step-line { flex: 1; height: 3px; background: #d1d5db; }
+  .step-active .step-circle { background: #2563eb; color: white; }
+  .step-done .step-circle { background: #16a34a; color: white; }
+  .step-inactive .step-circle { background: #d1d5db; color: #6b7280; }
+  .step-label { font-size: 12px; margin-top: 4px; text-align: center; white-space: nowrap; }
+  .step-active .step-label { color: #2563eb; font-weight: 600; }
+  .step-done .step-label { color: #16a34a; }
+  .step-inactive .step-label { color: #9ca3af; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+  .modal { background: white; border-radius: 12px; padding: 24px; max-width: 600px; width: 90%; max-height: 85vh; overflow-y: auto; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; min-width: 100%; font-size: 13px; }
+  th, td { border: 1px solid #d1d5db; padding: 6px 8px; white-space: nowrap; }
+  th { background: #f1f5f9; font-weight: 600; text-align: center; position: sticky; top: 0; z-index: 2; }
+  td input, td select { border: none; background: transparent; width: 100%; min-width: 60px; padding: 2px 4px; outline: none; font-size: 13px; }
+  td input:focus { background: #eff6ff; border-radius: 3px; }
+  .autofill { background: #f9fafb !important; color: #6b7280; }
+  .drag-handle { cursor: grab; color: #9ca3af; font-size: 18px; user-select: none; }
+  .drag-handle:active { cursor: grabbing; }
+  .drag-over { border-top: 3px solid #2563eb; }
+  .dragging { opacity: 0.4; }
+  .box-group-1 { border-left: 4px solid #f59e0b; }
+  .box-group-2 { border-left: 4px solid #10b981; }
+  .box-group-3 { border-left: 4px solid #8b5cf6; }
+  .box-group-4 { border-left: 4px solid #ef4444; }
+  .box-group-5 { border-left: 4px solid #3b82f6; }
+  .merged-slave td.box-col { background: #fef9c3; }
+  .verify-mismatch { background: #fee2e2 !important; }
+  .verify-missing { background: #fef9c3 !important; }
+  .tooltip-wrap { position: relative; }
+  .tooltip-wrap:hover .tooltip-box { display: block; }
+  .tooltip-box { display: none; position: absolute; bottom: 100%; left: 0; background: #1f2937; color: white; padding: 6px 10px; border-radius: 6px; font-size: 12px; white-space: pre-wrap; max-width: 280px; z-index: 50; }
+  .btn { padding: 8px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+  .btn-primary { background: #2563eb; color: white; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-success { background: #16a34a; color: white; }
+  .btn-success:hover { background: #15803d; }
+  .btn-warning { background: #d97706; color: white; }
+  .btn-warning:hover { background: #b45309; }
+  .btn-danger { background: #dc2626; color: white; }
+  .btn-danger:hover { background: #b91c1c; }
+  .btn-gray { background: #6b7280; color: white; }
+  .btn-gray:hover { background: #4b5563; }
+  .btn-outline { background: white; border: 2px solid #2563eb; color: #2563eb; }
+  .btn-outline:hover { background: #eff6ff; }
+  .customer-card { border: 2px solid #e5e7eb; border-radius: 12px; padding: 20px 28px; cursor: pointer; transition: all 0.15s; background: white; }
+  .customer-card:hover { border-color: #2563eb; background: #eff6ff; }
+  .customer-card.selected { border-color: #2563eb; background: #dbeafe; }
+  .item-card { border: 2px solid #e5e7eb; border-radius: 12px; padding: 16px 20px; cursor: pointer; transition: all 0.15s; background: white; }
+  .item-card:hover { border-color: #2563eb; background: #eff6ff; }
+  .item-card.selected { border-color: #2563eb; background: #dbeafe; }
+  .summary-card { border-radius: 10px; padding: 16px 20px; text-align: center; }
+  input[type=checkbox] { width: 18px; height: 18px; cursor: pointer; }
+  .section-title { font-size: 20px; font-weight: 700; color: #1e40af; margin-bottom: 16px; }
+  .error-item { cursor: pointer; padding: 8px 12px; border-radius: 6px; transition: background 0.1s; }
+  .error-item:hover { background: #f1f5f9; }
+</style>
+</head>
+<body>
+<div id="app" class="min-h-screen">
+  <!-- Header -->
+  <div class="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+    <div class="max-w-screen-2xl mx-auto">
+      <h1 class="text-2xl font-bold text-blue-800 mb-1">河源送印尼物料填单工具</h1>
+      <p class="text-sm text-gray-500">客人：<span id="header-customer" class="font-semibold text-blue-600">未选择</span>　货号：<span id="header-items" class="font-semibold text-green-600">未选择</span></p>
+    </div>
+  </div>
+
+  <!-- Step Navigation -->
+  <div class="bg-white shadow-sm px-6 py-4 mb-4">
+    <div class="max-w-screen-2xl mx-auto">
+      <div class="step-nav gap-0">
+        <div class="step-item step-inactive" id="step-nav-1" onclick="goStep(1)">
+          <div class="step-circle">1</div>
+          <div class="step-label">选择客人</div>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-item step-inactive" id="step-nav-2" onclick="goStep(2)">
+          <div class="step-circle">2</div>
+          <div class="step-label">选择货号</div>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-item step-inactive" id="step-nav-3" onclick="goStep(3)">
+          <div class="step-circle">3</div>
+          <div class="step-label">填写数据</div>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-item step-inactive" id="step-nav-4" onclick="goStep(4)">
+          <div class="step-circle">4</div>
+          <div class="step-label">数据核对</div>
+        </div>
+        <div class="step-line"></div>
+        <div class="step-item step-inactive" id="step-nav-5" onclick="goStep(5)">
+          <div class="step-circle">5</div>
+          <div class="step-label">导出Excel</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step Content -->
+  <div class="max-w-screen-2xl mx-auto px-4 pb-8">
+
+    <!-- Step 1: Select Customer -->
+    <div id="step-1" class="step-content hidden">
+      <div class="section-title">第一步：选择客人</div>
+      <div class="mb-4">
+        <button class="btn btn-primary" onclick="showAddCustomerModal()">+ 添加客人</button>
+      </div>
+      <div id="customer-list" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
+      <button class="btn btn-success text-lg px-8 py-3" onclick="goStep(2)">下一步：选择货号 →</button>
+    </div>
+
+    <!-- Step 2: Select Item Numbers -->
+    <div id="step-2" class="step-content hidden">
+      <div class="section-title">第二步：选择货号</div>
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+        <div class="text-sm font-semibold text-blue-800 mb-2">📦 基础数据管理</div>
+        <div class="flex gap-3 flex-wrap">
+          <button class="btn btn-primary" onclick="showAddItemModal()">+ 手动添加货号/物料</button>
+          <button class="btn btn-warning" onclick="document.getElementById('bulk-import-file').click()">📥 批量导入物料</button>
+          <input type="file" id="bulk-import-file" accept=".xlsx,.xls" class="hidden" onchange="bulkImportMaterials(this)">
+          <button class="btn btn-outline" onclick="downloadImportTemplate()">⬇ 下载导入模板</button>
+          <button class="btn btn-outline" onclick="loadTemplateModal()">📋 加载填单模板</button>
+          <button class="btn btn-success" onclick="openMaterialsManager()">🗂 增删改物料资料</button>
+        </div>
+      </div>
+      <div id="item-list" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
+      <div class="flex gap-3">
+        <button class="btn btn-gray" onclick="goStep(1)">← 上一步</button>
+        <button class="btn btn-success text-lg px-8 py-3" onclick="confirmItemSelection()">下一步：填写数据 →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Fill Data -->
+    <div id="step-3" class="step-content hidden">
+      <div class="section-title">第三步：填写数据</div>
+      <div class="flex gap-2 mb-4 flex-wrap items-center">
+        <button class="btn btn-outline" onclick="document.getElementById('import-po-file').click()">📂 导入采购单（自动填充）</button>
+        <input type="file" id="import-po-file" accept=".xlsx,.xls,.csv" class="hidden" onchange="importPurchaseOrder(this)">
+        <button class="btn btn-outline" onclick="downloadPOTemplate()">⬇ 下载采购单模板</button>
+        <button class="btn btn-primary" onclick="addRow()">+ 添加行</button>
+        <button class="btn btn-warning" onclick="mergeSelectedBoxes()">📦 合并选中行箱信息</button>
+        <button class="btn btn-gray" onclick="unmergeSelected()">拆分合并</button>
+        <button class="btn btn-success" onclick="saveTemplate()">💾 保存模板</button>
+        <button class="btn btn-outline" onclick="loadTemplateModal()">📋 加载模板</button>
+      </div>
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-700">
+        <strong>操作提示：</strong>拖动行左侧 ☰ 可排序；勾选多行后点"合并选中行箱信息"共享箱数据；导入采购单可自动识别并填充数量/单价（显示为灰色底色）。
+      </div>
+      <div class="table-wrap bg-white rounded-lg shadow border border-gray-200">
+        <table id="data-table">
+          <thead>
+            <tr>
+              <th style="min-width:30px"></th>
+              <th style="min-width:30px"><input type="checkbox" id="select-all" onchange="toggleSelectAll(this)"></th>
+              <th style="min-width:40px">序号</th>
+              <th style="min-width:80px">货号</th>
+              <th style="min-width:120px">产品中文名称</th>
+              <th style="min-width:140px">产品英文名称</th>
+              <th style="min-width:100px">规格</th>
+              <th style="min-width:70px">类别</th>
+              <th style="min-width:60px">单位</th>
+              <th style="min-width:90px">送货KG重量</th>
+              <th style="min-width:80px">送货数量</th>
+              <th style="min-width:90px">毛重总重</th>
+              <th style="min-width:90px">净重总重</th>
+              <th style="min-width:100px" class="bg-yellow-50">立方数/每箱 ⚙</th>
+              <th style="min-width:80px" class="bg-yellow-50">总立方数 ⚙</th>
+              <th style="min-width:60px">图片</th>
+              <th style="min-width:100px">产品用途</th>
+              <th style="min-width:100px">合同号码</th>
+              <th style="min-width:100px">合同日期</th>
+              <th style="min-width:80px">发票号</th>
+              <th style="min-width:90px">发票日期</th>
+              <th style="min-width:80px">发票单价</th>
+              <th style="min-width:80px">发票金额</th>
+              <th style="min-width:90px">发票合计</th>
+              <th style="min-width:100px">供应商</th>
+              <th style="min-width:100px">采购单日期</th>
+              <th style="min-width:100px">采购单号</th>
+              <th style="min-width:80px">采购单价</th>
+              <th style="min-width:80px">采购金额</th>
+              <th style="min-width:80px">采购总额</th>
+              <th style="min-width:120px">报关出口公司</th>
+              <th style="min-width:100px">提单抬头</th>
+              <th style="min-width:80px" class="bg-yellow-50">箱数</th>
+              <th style="min-width:70px" class="bg-yellow-50">长(cm)</th>
+              <th style="min-width:70px" class="bg-yellow-50">宽(cm)</th>
+              <th style="min-width:70px" class="bg-yellow-50">高(cm)</th>
+              <th style="min-width:100px">物料编码</th>
+              <th style="min-width:120px">中国HSCODE</th>
+              <th style="min-width:130px">印尼HS CODE</th>
+              <th style="min-width:80px" title="单位：g（克）">物料单重(g)</th>
+              <th style="min-width:70px">单个净重</th>
+              <th style="min-width:90px" class="bg-orange-50" title="单位：kg/箱，用于计算毛重">纸箱重量(kg)</th>
+              <th style="min-width:60px">币种</th>
+              <th style="min-width:60px">操作</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+      <div class="flex gap-3 mt-4">
+        <button class="btn btn-gray" onclick="goStep(2)">← 上一步</button>
+        <button class="btn btn-success text-lg px-8 py-3" onclick="goStep(4)">下一步：数据核对 →</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Verify Data -->
+    <div id="step-4" class="step-content hidden">
+      <div class="section-title">第四步：数据核对</div>
+      <div class="flex gap-3 mb-4 flex-wrap items-center">
+        <button class="btn btn-outline" onclick="document.getElementById('verify-files').click()">📂 导入核对文件（可多选）</button>
+        <input type="file" id="verify-files" accept=".xlsx,.xls,.csv" multiple class="hidden" onchange="importVerifyFiles(this)">
+        <button class="btn btn-outline" onclick="downloadPOTemplate()" title="与第三步采购单模板共用同一格式">⬇ 下载核对模板</button>
+        <button class="btn btn-primary" onclick="runVerification()">🔍 开始核对</button>
+        <button class="btn btn-gray" onclick="clearVerification()">清除核对结果</button>
+      </div>
+      <div id="verify-files-list" class="mb-4 text-sm text-gray-600"></div>
+
+      <!-- Self-Check Panel -->
+      <div id="self-check-panel" class="mb-5">
+        <div class="flex items-center justify-between mb-2">
+          <div class="font-semibold text-gray-700">🔎 自动自检提醒</div>
+          <button class="text-xs text-gray-400 underline" onclick="document.getElementById('self-check-body').classList.toggle('hidden')">展开/收起</button>
+        </div>
+        <div id="self-check-body" class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm max-h-64 overflow-y-auto">
+          <div id="self-check-items" class="text-gray-500 italic">进入此页面后自动检查…</div>
+        </div>
+        <div class="text-xs text-gray-400 mt-1">以上仅为提醒，不影响导出操作，确认无误后可直接导出。</div>
+      </div>
+
+      <!-- Summary Panel -->
+      <div id="verify-summary" class="hidden mb-6">
+        <div class="grid grid-cols-3 gap-4 mb-4">
+          <div class="summary-card bg-green-50 border border-green-200">
+            <div class="text-2xl font-bold text-green-700" id="sum-match">0</div>
+            <div class="text-sm text-green-600">匹配正确</div>
+          </div>
+          <div class="summary-card bg-red-50 border border-red-200">
+            <div class="text-2xl font-bold text-red-700" id="sum-mismatch">0</div>
+            <div class="text-sm text-red-600">数据不匹配</div>
+          </div>
+          <div class="summary-card bg-yellow-50 border border-yellow-200">
+            <div class="text-2xl font-bold text-yellow-700" id="sum-missing">0</div>
+            <div class="text-sm text-yellow-600">缺失项目</div>
+          </div>
+        </div>
+        <div id="error-list" class="bg-white rounded-lg border border-gray-200 p-4 max-h-48 overflow-y-auto"></div>
+      </div>
+      <!-- Verify Table -->
+      <div id="verify-table-wrap" class="hidden">
+        <div class="table-wrap bg-white rounded-lg shadow border border-gray-200">
+          <table id="verify-table">
+            <thead>
+              <tr>
+                <th>序号</th>
+                <th>货号</th>
+                <th>物料编码</th>
+                <th>产品中文名称</th>
+                <th>送货数量</th>
+                <th>采购单价</th>
+                <th>供应商</th>
+                <th>规格</th>
+                <th>币种</th>
+                <th>核对状态</th>
+              </tr>
+            </thead>
+            <tbody id="verify-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="flex gap-3 mt-4">
+        <button class="btn btn-gray" onclick="goStep(3)">← 上一步</button>
+        <button class="btn btn-success text-lg px-8 py-3" onclick="goStep(5)">下一步：导出Excel →</button>
+      </div>
+    </div>
+
+    <!-- Step 5: Export Excel -->
+    <div id="step-5" class="step-content hidden">
+      <div class="section-title">第五步：导出Excel</div>
+      <div class="bg-white rounded-xl shadow p-6 max-w-lg">
+        <p class="text-gray-600 mb-6">填写以下信息后，点击按钮生成Excel文件。</p>
+        <div class="grid grid-cols-2 gap-4 mb-6">
+          <div>
+            <label class="block text-sm font-semibold mb-1">装柜日期 <span class="text-red-500">*</span></label>
+            <input type="date" id="exp-loading-date" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">送达厂区英文缩写 <span class="text-red-500">*</span></label>
+            <input type="text" id="exp-factory-code" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="如：RRI">
+          </div>
+        </div>
+        <p class="text-xs text-gray-400 mb-4">文件名示例：<span id="exp-filename-preview" class="font-mono text-blue-600">20250405RRI.xlsx</span></p>
+        <button class="btn btn-success text-xl px-12 py-4 w-full" onclick="exportExcel()">📥 导出Excel文件</button>
+      </div>
+      <div class="mt-4">
+        <button class="btn btn-gray" onclick="goStep(4)">← 上一步</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal: Manage All Materials (CRUD) -->
+<div id="modal-manage-materials" class="modal-overlay hidden">
+  <div class="modal" style="max-width:95vw;width:1200px;max-height:90vh">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-xl font-bold">增删改物料资料</h2>
+      <div class="flex gap-2 items-center">
+        <input type="text" id="mat-search" placeholder="搜索货号/名称/物料编码…" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-52" oninput="renderMaterialsManager()">
+        <button class="btn btn-primary" onclick="openAddMatRow()">+ 新增物料</button>
+        <button class="btn btn-gray" onclick="closeModal('modal-manage-materials')">关闭</button>
+      </div>
+    </div>
+    <!-- Inline add form -->
+    <div id="mat-add-form" class="hidden border border-blue-200 rounded-lg p-3 mb-3 bg-blue-50">
+      <div class="text-sm font-semibold text-blue-800 mb-2">新增物料</div>
+      <div class="grid grid-cols-4 gap-2 text-xs">
+        <div><label class="text-gray-500">货号 *</label><input id="madd-itemNo" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">物料编码 *</label><input id="madd-materialCode" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">产品中文名称</label><input id="madd-nameCN" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">产品英文名称</label><input id="madd-nameEN" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">规格</label><input id="madd-spec" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">类别</label><input id="madd-category" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">单位</label><input id="madd-unit" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">物料单重(g)</label><input id="madd-unitWeight" type="number" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">单个净重(kg)</label><input id="madd-netWeight" type="number" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">纸箱重量(kg)</label><input id="madd-cartonWeight" type="number" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">发票单价</label><input id="madd-invoicePrice" type="number" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">采购单价</label><input id="madd-purchasePrice" type="number" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">供应商</label><input id="madd-supplier" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">报关出口公司</label><input id="madd-exportCo" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">提单抬头</label><input id="madd-blHead" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">币种</label><input id="madd-currency" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">产品用途</label><input id="madd-usage" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">中国HSCODE</label><input id="madd-hscodeChina" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+        <div><label class="text-gray-500">印尼HS CODE</label><input id="madd-hscodeIndonesia" class="w-full border border-gray-300 rounded px-2 py-1"></div>
+      </div>
+      <div class="flex gap-2 mt-2 justify-end">
+        <button class="btn btn-gray text-sm py-1 px-3" onclick="closeAddMatRow()">取消</button>
+        <button class="btn btn-primary text-sm py-1 px-3" onclick="confirmAddMatRow()">确认新增</button>
+      </div>
+    </div>
+    <div class="overflow-auto" style="max-height:60vh">
+      <table class="text-xs" style="font-size:12px">
+        <thead>
+          <tr>
+            <th style="min-width:70px">货号</th>
+            <th style="min-width:80px">物料编码</th>
+            <th style="min-width:120px">中文名称</th>
+            <th style="min-width:120px">英文名称</th>
+            <th style="min-width:70px">规格</th>
+            <th style="min-width:50px">类别</th>
+            <th style="min-width:40px">单位</th>
+            <th style="min-width:70px">物料单重(g)</th>
+            <th style="min-width:70px">净重(kg)</th>
+            <th style="min-width:70px">纸箱重(kg)</th>
+            <th style="min-width:60px">发票单价</th>
+            <th style="min-width:60px">采购单价</th>
+            <th style="min-width:100px">供应商</th>
+            <th style="min-width:100px">报关出口公司</th>
+            <th style="min-width:100px">提单抬头</th>
+            <th style="min-width:40px">币种</th>
+            <th style="min-width:70px">产品用途</th>
+            <th style="min-width:80px">中国HSCODE</th>
+            <th style="min-width:80px">印尼HSCODE</th>
+            <th style="min-width:60px">操作</th>
+          </tr>
+        </thead>
+        <tbody id="mat-manager-tbody"></tbody>
+      </table>
+    </div>
+    <div class="text-xs text-gray-400 mt-2" id="mat-manager-count"></div>
+  </div>
+</div>
+
+<!-- Modal: Add Customer -->
+<div id="modal-customer" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 class="text-xl font-bold mb-4">添加客人</h2>
+    <div class="mb-4">
+      <label class="block text-sm font-semibold mb-1">客人名称 *</label>
+      <input type="text" id="new-customer-name" class="w-full border border-gray-300 rounded-lg px-3 py-3 text-lg" placeholder="输入客人名称">
+    </div>
+    <div class="flex gap-3 justify-end">
+      <button class="btn btn-gray" onclick="closeModal('modal-customer')">取消</button>
+      <button class="btn btn-primary" onclick="addCustomer()">确认添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Item/Material -->
+<div id="modal-item" class="modal-overlay hidden">
+  <div class="modal" style="max-width:700px">
+    <h2 class="text-xl font-bold mb-4">添加货号/物料</h2>
+    <div class="mb-4">
+      <label class="block text-sm font-semibold mb-1">货号 *</label>
+      <input type="text" id="new-item-no" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="如：40039">
+    </div>
+    <div id="new-materials-list"></div>
+    <button class="btn btn-outline mb-4 w-full" onclick="addMaterialForm()">+ 添加一行物料</button>
+    <div class="flex gap-3 justify-end">
+      <button class="btn btn-gray" onclick="closeModal('modal-item')">取消</button>
+      <button class="btn btn-primary" onclick="saveNewItem()">确认保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Template -->
+<div id="modal-template" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 class="text-xl font-bold mb-4">加载模板</h2>
+    <div id="template-list"></div>
+    <div class="flex gap-3 justify-end mt-4">
+      <button class="btn btn-gray" onclick="closeModal('modal-template')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Save Template Name -->
+<div id="modal-save-tpl" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 class="text-xl font-bold mb-4">保存为模板</h2>
+    <div class="mb-4">
+      <label class="block text-sm font-semibold mb-1">模板名称 *</label>
+      <input type="text" id="tpl-name" class="w-full border border-gray-300 rounded-lg px-3 py-3 text-lg" placeholder="如：buzzbee 40039 常规出货">
+    </div>
+    <div class="flex gap-3 justify-end">
+      <button class="btn btn-gray" onclick="closeModal('modal-save-tpl')">取消</button>
+      <button class="btn btn-primary" onclick="doSaveTemplate()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Bulk Import Duplicate Confirm -->
+<div id="modal-bulk-confirm" class="modal-overlay hidden">
+  <div class="modal" style="max-width:480px">
+    <h2 class="text-xl font-bold mb-3">⚠️ 发现重复物料</h2>
+    <p id="bulk-confirm-msg" class="text-gray-700 mb-2"></p>
+    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-sm text-yellow-800 max-h-40 overflow-y-auto" id="bulk-dup-list"></div>
+    <p class="text-gray-600 text-sm mb-4">请选择处理方式：</p>
+    <div class="flex gap-3 justify-end">
+      <button class="btn btn-gray" onclick="finalizeBulkImport(false)">跳过重复，仅导入新物料</button>
+      <button class="btn btn-warning" onclick="finalizeBulkImport(true)">覆盖原有数据</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  STATE & STORAGE
+// ============================================================
+const LS = {
+  get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch(e) { return null; } },
+  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+};
+
+let state = {
+  currentStep: 1,
+  selectedCustomer: null,
+  selectedItems: [],       // array of item numbers (strings)
+  rows: [],                // current table rows
+  boxGroups: {},           // rowId -> groupId
+  groupCounter: 0,
+  verifyData: [],          // imported verify file rows
+  verifyResult: [],        // result rows with status
+};
+
+// ============================================================
+//  INITIAL DATA SEED
+// ============================================================
+function initDefaultData() {
+  if (!LS.get('customers')) {
+    LS.set('customers', ['buzzbee']);
+  }
+  if (!LS.get('materials')) {
+    LS.set('materials', [
+      { itemNo:'40039', nameCN:'棉花糖', nameEN:'Cotton Candy', spec:'', category:'食品', unit:'包', image:'', invoicePrice:5.00, supplier:'广州供应商A', purchasePrice:4.50, exportCo:'广州出口有限公司', blHead:'BUZZBEE INDONESIA', materialCode:'MAT-001', unitWeight:0.5, currency:'CNY' },
+      { itemNo:'40039', nameCN:'巧克力豆', nameEN:'Chocolate Chips', spec:'', category:'食品', unit:'袋', image:'', invoicePrice:12.00, supplier:'深圳供应商B', purchasePrice:10.00, exportCo:'广州出口有限公司', blHead:'BUZZBEE INDONESIA', materialCode:'MAT-002', unitWeight:1.0, currency:'CNY' },
+      { itemNo:'40039', nameCN:'糖果包装袋', nameEN:'Candy Packaging Bag', spec:'', category:'包材', unit:'个', image:'', invoicePrice:0.50, supplier:'东莞供应商C', purchasePrice:0.40, exportCo:'广州出口有限公司', blHead:'BUZZBEE INDONESIA', materialCode:'MAT-003', unitWeight:0.02, currency:'CNY' },
+      { itemNo:'40039', nameCN:'纸箱', nameEN:'Carton Box', spec:'', category:'包材', unit:'个', image:'', invoicePrice:3.00, supplier:'广州供应商D', purchasePrice:2.50, exportCo:'广州出口有限公司', blHead:'BUZZBEE INDONESIA', materialCode:'MAT-004', unitWeight:0.3, currency:'CNY' },
+    ]);
+  }
+  if (!LS.get('templates')) {
+    LS.set('templates', []);
+  }
+}
+
+// ============================================================
+//  STEP NAVIGATION
+// ============================================================
+function goStep(n) {
+  state.currentStep = n;
+  document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
+  document.getElementById('step-' + n).classList.remove('hidden');
+  for (let i = 1; i <= 5; i++) {
+    const nav = document.getElementById('step-nav-' + i);
+    nav.className = 'step-item ' + (i === n ? 'step-active' : (i < n ? 'step-done' : 'step-inactive'));
+  }
+  if (n === 1) renderCustomers();
+  if (n === 2) renderItems();
+  if (n === 3) renderTable();
+  if (n === 4) { renderVerifyTable(); runSelfCheck(); }
+}
+
+// ============================================================
+//  STEP 1: CUSTOMERS
+// ============================================================
+function renderCustomers() {
+  const customers = LS.get('customers') || [];
+  const el = document.getElementById('customer-list');
+  el.innerHTML = customers.map(c => `
+    <div class="customer-card ${state.selectedCustomer===c?'selected':''}" onclick="selectCustomer('${c}')">
+      <div class="text-2xl font-bold text-blue-700">${c}</div>
+      <div class="text-sm text-gray-400 mt-1">点击选择</div>
+    </div>
+  `).join('');
+  updateHeader();
+}
+
+function selectCustomer(name) {
+  state.selectedCustomer = name;
+  renderCustomers();
+}
+
+function showAddCustomerModal() {
+  document.getElementById('new-customer-name').value = '';
+  showModal('modal-customer');
+}
+
+function addCustomer() {
+  const name = document.getElementById('new-customer-name').value.trim();
+  if (!name) return alert('请输入客人名称');
+  const list = LS.get('customers') || [];
+  if (list.includes(name)) return alert('客人已存在');
+  list.push(name);
+  LS.set('customers', list);
+  closeModal('modal-customer');
+  renderCustomers();
+}
+
+// ============================================================
+//  STEP 2: ITEMS
+// ============================================================
+function getItemNos() {
+  const mats = LS.get('materials') || [];
+  return [...new Set(mats.map(m => m.itemNo))];
+}
+
+function renderItems() {
+  const items = getItemNos();
+  const el = document.getElementById('item-list');
+  el.innerHTML = items.map(no => {
+    const mats = (LS.get('materials') || []).filter(m => m.itemNo === no);
+    const sel = state.selectedItems.includes(no);
+    return `
+      <div class="item-card ${sel?'selected':''}" onclick="toggleItem('${no}')">
+        <div class="text-xl font-bold text-blue-700">${no}</div>
+        <div class="text-sm text-gray-500 mt-1">${mats.length} 个物料</div>
+        <div class="text-xs text-gray-400 mt-1">${mats.slice(0,2).map(m=>m.nameCN).join('、')}${mats.length>2?'...':''}</div>
+        ${sel ? '<div class="mt-2 text-xs text-blue-600 font-semibold">✓ 已选</div>':''}
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleItem(no) {
+  if (state.selectedItems.includes(no)) {
+    state.selectedItems = state.selectedItems.filter(x => x !== no);
+  } else {
+    state.selectedItems.push(no);
+  }
+  renderItems();
+  updateHeader();
+}
+
+function confirmItemSelection() {
+  if (!state.selectedCustomer) return alert('请先选择客人');
+  if (state.selectedItems.length === 0) return alert('请至少选择一个货号');
+  buildRowsFromSelection();
+  goStep(3);
+}
+
+function buildRowsFromSelection() {
+  const mats = LS.get('materials') || [];
+  const existingCodes = state.rows.map(r => r.materialCode + '|' + r.itemNo);
+  const newRows = [];
+  state.selectedItems.forEach(itemNo => {
+    const items = mats.filter(m => m.itemNo === itemNo);
+    items.forEach(m => {
+      const key = m.materialCode + '|' + m.itemNo;
+      if (!existingCodes.includes(key)) {
+        newRows.push(createRow(m));
+      }
+    });
+  });
+  state.rows = [...state.rows, ...newRows];
+  sortRowsByCategory();
+}
+
+function createRow(mat) {
+  return {
+    id: 'r' + Date.now() + Math.floor(Math.random()*10000),
+    itemNo: mat.itemNo || '',
+    nameCN: mat.nameCN || '',
+    nameEN: mat.nameEN || '',
+    spec: mat.spec || '',
+    category: mat.category || '',
+    unit: mat.unit || '',
+    qty: '',
+    supplier: mat.supplier || '',
+    purchasePrice: mat.purchasePrice || '',
+    purchaseAmount: '',
+    invoicePrice: mat.invoicePrice || '',
+    invoiceAmount: '',
+    unitWeight: mat.unitWeight || '',
+    kgWeight: '',
+    grossWeight: '',
+    netWeight: mat.netWeight || '',
+    netWeightTotal: '',
+    cartonWeight: mat.cartonWeight || '',
+    currency: mat.currency || '',
+    usage: mat.usage || '',
+    exportCo: mat.exportCo || '',
+    blHead: mat.blHead || '',
+    hscodeChina: mat.hscodeChina || '',
+    hscodeIndonesia: mat.hscodeIndonesia || '',
+    contractNo: mat.contractNo || '',
+    contractDate: mat.contractDate || '',
+    invoiceNo: mat.invoiceNo || '',
+    invoiceDate: mat.invoiceDate || '',
+    invoiceTotal: '',
+    poDate: mat.poDate || '',
+    poNo: mat.poNo || '',
+    purchaseTotal: '',
+    length: '',
+    width: '',
+    height: '',
+    cartons: '',
+    qtyPerCarton: '',
+    cbmPerCarton: '',
+    totalCbm: '',
+    image: mat.image || '',
+    materialCode: mat.materialCode || '',
+    autofilled: false,
+    groupId: null,
+  };
+}
+
+// Add/Edit Item Modal
+let materialForms = [];
+function showAddItemModal() {
+  document.getElementById('new-item-no').value = '';
+  materialForms = [{}];
+  renderMaterialForms();
+  showModal('modal-item');
+}
+
+function renderMaterialForms() {
+  const fields = [
+    ['nameCN','产品中文名称'],['nameEN','产品英文名称'],['spec','规格'],['category','类别'],
+    ['unit','单位'],['usage','产品用途'],['invoicePrice','发票单价'],
+    ['supplier','供应商'],['purchasePrice','采购单价'],['exportCo','报关出口公司'],
+    ['blHead','提单抬头'],['materialCode','物料编码'],['unitWeight','物料单重'],
+    ['netWeight','单个净重'],['currency','币种']
+  ];
+  const el = document.getElementById('new-materials-list');
+  el.innerHTML = materialForms.map((mf, idx) => `
+    <div class="border border-gray-200 rounded-lg p-3 mb-3">
+      <div class="flex justify-between items-center mb-2">
+        <span class="font-semibold text-gray-700">物料 ${idx+1}</span>
+        ${materialForms.length > 1 ? `<button class="text-red-500 text-sm" onclick="removeMaterialForm(${idx})">删除</button>` : ''}
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        ${fields.map(([f, label]) => `
+          <div>
+            <label class="text-xs text-gray-500">${label}</label>
+            <input type="text" class="w-full border border-gray-200 rounded px-2 py-1 text-sm"
+              value="${mf[f]||''}" onchange="updateMaterialForm(${idx},'${f}',this.value)">
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function addMaterialForm() { materialForms.push({}); renderMaterialForms(); }
+function removeMaterialForm(idx) { materialForms.splice(idx, 1); renderMaterialForms(); }
+function updateMaterialForm(idx, field, val) { materialForms[idx][field] = val; }
+
+function saveNewItem() {
+  const itemNo = document.getElementById('new-item-no').value.trim();
+  if (!itemNo) return alert('请输入货号');
+  const mats = LS.get('materials') || [];
+  materialForms.forEach(mf => {
+    mats.push({ itemNo, ...mf });
+  });
+  LS.set('materials', mats);
+  closeModal('modal-item');
+  renderItems();
+}
+
+// ============================================================
+//  STEP 3: DATA TABLE
+// ============================================================
+let dragSrcIdx = null;
+
+// Sort rows by category (stable sort, preserving relative order within same category)
+function sortRowsByCategory() {
+  const order = {};
+  state.rows.forEach((r, i) => {
+    const cat = (r.category || '').trim();
+    if (!(cat in order)) order[cat] = i; // first occurrence index preserves category order
+  });
+  state.rows.sort((a, b) => {
+    const ca = (a.category || '').trim();
+    const cb = (b.category || '').trim();
+    if (ca === cb) return 0;
+    return order[ca] - order[cb];
+  });
+}
+
+// Compute visual merge groups: consecutive rows where category+supplier+exportCo+blHead all match
+function computeMergeGroups() {
+  // Returns an array parallel to state.rows; each entry is { rowspan, hidden, invoiceTotalMerged, purchaseTotalMerged }
+  const n = state.rows.length;
+  const result = Array.from({length: n}, () => ({ rowspan: 1, hidden: false, invoiceTotalMerged: null, purchaseTotalMerged: null }));
+  let i = 0;
+  while (i < n) {
+    const row = state.rows[i];
+    const cat = (row.category || '').trim();
+    const sup = (row.supplier || '').trim();
+    const exp = (row.exportCo || '').trim();
+    const bl  = (row.blHead || '').trim();
+    // Only merge if all 4 fields are non-empty
+    if (cat && sup && exp && bl) {
+      let j = i + 1;
+      while (j < n) {
+        const r2 = state.rows[j];
+        if ((r2.category||'').trim() === cat && (r2.supplier||'').trim() === sup &&
+            (r2.exportCo||'').trim() === exp && (r2.blHead||'').trim() === bl) {
+          j++;
+        } else { break; }
+      }
+      const span = j - i;
+      if (span > 1) {
+        // Sum amounts for the group
+        let invSum = 0, purSum = 0, hasInv = false, hasPur = false;
+        for (let k = i; k < j; k++) {
+          const v1 = parseFloat(state.rows[k].invoiceAmount);
+          const v2 = parseFloat(state.rows[k].purchaseAmount);
+          if (!isNaN(v1)) { invSum += v1; hasInv = true; }
+          if (!isNaN(v2)) { purSum += v2; hasPur = true; }
+        }
+        result[i].rowspan = span;
+        result[i].invoiceTotalMerged = hasInv ? invSum.toFixed(2) : '';
+        result[i].purchaseTotalMerged = hasPur ? purSum.toFixed(2) : '';
+        for (let k = i + 1; k < j; k++) {
+          result[k].hidden = true;
+        }
+        i = j;
+        continue;
+      }
+    }
+    i++;
+  }
+  return result;
+}
+
+function renderTable() {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+  const mergeInfo = computeMergeGroups();
+  state.rows.forEach((row, idx) => {
+    tbody.appendChild(createTableRow(row, idx, mergeInfo[idx]));
+  });
+}
+
+function createTableRow(row, idx, mergeInfo) {
+  const mi = mergeInfo || { rowspan: 1, hidden: false, invoiceTotalMerged: null, purchaseTotalMerged: null };
+  const tr = document.createElement('tr');
+  tr.dataset.id = row.id;
+  tr.dataset.idx = idx;
+  if (row.groupId !== null) tr.classList.add('box-group-' + (row.groupId % 5 + 1));
+
+  // Determine if this row is a "slave" in a box group (not the first in group)
+  const groupRows = row.groupId !== null ? state.rows.filter(r => r.groupId === row.groupId) : [];
+  const isMaster = row.groupId === null || groupRows[0].id === row.id;
+
+  const rid = row.id; // string id safe for attribute embedding
+
+  // Build box cell content
+  function boxCell(field, readonly) {
+    if (!isMaster && row.groupId !== null) {
+      return `<td class="box-col" style="background:#fef9c3;text-align:center;font-size:11px;color:#92400e;">↑合并</td>`;
+    }
+    const readonlyAttr = readonly ? `readonly data-field="${field}" style="background:#f3f4f6"` : '';
+    return `<td class="box-col"><input type="text" value="${row[field]||''}" ${readonlyAttr}
+      data-rid="${rid}" data-field="${field}" class="box-input"></td>`;
+  }
+
+  const afStyle = row.autofilled ? 'background:#f9fafb;color:#6b7280' : '';
+
+  tr.innerHTML = `
+    <td class="drag-handle" style="text-align:center;cursor:grab">☰</td>
+    <td style="text-align:center"><input type="checkbox" class="row-check" data-id="${rid}"></td>
+    <td style="text-align:center;color:#6b7280">${idx+1}</td>
+    <td><input type="text" value="${row.itemNo||''}" data-rid="${rid}" data-field="itemNo" class="row-input"></td>
+    <td><input type="text" value="${row.nameCN||''}" data-rid="${rid}" data-field="nameCN" class="row-input"></td>
+    <td><input type="text" value="${row.nameEN||''}" data-rid="${rid}" data-field="nameEN" class="row-input"></td>
+    <td><input type="text" value="${row.spec||''}" data-rid="${rid}" data-field="spec" class="row-input"></td>
+    <td><input type="text" value="${row.category||''}" data-rid="${rid}" data-field="category" class="row-input"></td>
+    <td><input type="text" value="${row.unit||''}" data-rid="${rid}" data-field="unit" class="row-input"></td>
+    <td><input type="text" value="${row.kgWeight||''}" readonly data-field="kgWeight"></td>
+    <td><input type="number" value="${row.qty||''}" data-rid="${rid}" data-field="qty" class="row-input" style="${afStyle}" title="送货数量"></td>
+    <td><input type="text" value="${row.grossWeight||''}" readonly data-field="grossWeight"></td>
+    <td><input type="text" value="${row.netWeightTotal||''}" readonly data-field="netWeightTotal"></td>
+    ${boxCell('cbmPerCarton', true)}
+    ${boxCell('totalCbm', true)}
+    <td style="text-align:center" class="img-cell-${rid}">
+      ${row.image ? `<img src="${row.image}" style="width:40px;height:40px;object-fit:cover;border-radius:4px">` :
+        `<label style="cursor:pointer;font-size:11px;color:#2563eb">上传<input type="file" accept="image/*" class="hidden img-upload" data-rid="${rid}"></label>`}
+    </td>
+    <td><input type="text" value="${row.usage||''}" data-rid="${rid}" data-field="usage" class="row-input"></td>
+    <td><input type="text" value="${row.contractNo||''}" data-rid="${rid}" data-field="contractNo" class="row-input"></td>
+    <td><input type="date" value="${row.contractDate||''}" data-rid="${rid}" data-field="contractDate" class="row-input"></td>
+    <td><input type="text" value="${row.invoiceNo||''}" data-rid="${rid}" data-field="invoiceNo" class="row-input"></td>
+    <td><input type="date" value="${row.invoiceDate||''}" data-rid="${rid}" data-field="invoiceDate" class="row-input"></td>
+    <td><input type="number" value="${row.invoicePrice||''}" step="0.01" data-rid="${rid}" data-field="invoicePrice" class="row-input"></td>
+    <td><input type="text" value="${row.invoiceAmount||''}" readonly data-field="invoiceAmount"></td>
+    ${mi.hidden ? '' : `<td rowspan="${mi.rowspan}" style="${mi.rowspan>1?'background:#fef3c7;text-align:center;font-weight:bold;color:#92400e;vertical-align:middle;':''}">${mi.rowspan>1?(mi.invoiceTotalMerged||''):(row.invoiceTotal||'')}</td>`}
+    ${mi.hidden ? '' : `<td rowspan="${mi.rowspan}" style="${mi.rowspan>1?'background:#eff6ff;text-align:center;font-weight:bold;color:#1d4ed8;vertical-align:middle;':''}"><input type="text" value="${row.supplier||''}" data-rid="${rid}" data-field="supplier" class="row-input"></td>`}
+    <td><input type="date" value="${row.poDate||''}" data-rid="${rid}" data-field="poDate" class="row-input" style="${afStyle}"></td>
+    <td><input type="text" value="${row.poNo||''}" data-rid="${rid}" data-field="poNo" class="row-input" style="${afStyle}"></td>
+    <td><input type="number" value="${row.purchasePrice||''}" step="0.01" data-rid="${rid}" data-field="purchasePrice" class="row-input" style="${afStyle}"></td>
+    <td><input type="text" value="${row.purchaseAmount||''}" readonly data-field="purchaseAmount"></td>
+    ${mi.hidden ? '' : `<td rowspan="${mi.rowspan}" style="${mi.rowspan>1?'background:#fef3c7;text-align:center;font-weight:bold;color:#92400e;vertical-align:middle;':''}">${mi.rowspan>1?(mi.purchaseTotalMerged||''):(row.purchaseTotal||'')}</td>`}
+    ${mi.hidden ? '' : `<td rowspan="${mi.rowspan}" style="${mi.rowspan>1?'background:#eff6ff;text-align:center;font-weight:bold;color:#1d4ed8;vertical-align:middle;':''}"><input type="text" value="${row.exportCo||''}" data-rid="${rid}" data-field="exportCo" class="row-input"></td>`}
+    ${mi.hidden ? '' : `<td rowspan="${mi.rowspan}" style="${mi.rowspan>1?'background:#eff6ff;text-align:center;font-weight:bold;color:#1d4ed8;vertical-align:middle;':''}"><input type="text" value="${row.blHead||''}" data-rid="${rid}" data-field="blHead" class="row-input"></td>`}
+    ${boxCell('cartons', false)}
+    ${boxCell('length', false)}
+    ${boxCell('width', false)}
+    ${boxCell('height', false)}
+    <td><input type="text" value="${row.materialCode||''}" data-rid="${rid}" data-field="materialCode" class="row-input"></td>
+    <td><input type="text" value="${row.hscodeChina||''}" data-rid="${rid}" data-field="hscodeChina" class="row-input"></td>
+    <td><input type="text" value="${row.hscodeIndonesia||''}" data-rid="${rid}" data-field="hscodeIndonesia" class="row-input"></td>
+    <td><input type="number" value="${row.unitWeight||''}" step="0.1" data-rid="${rid}" data-field="unitWeight" class="row-input" title="单位：克(g)"></td>
+    <td><input type="number" value="${row.netWeight||''}" step="0.001" data-rid="${rid}" data-field="netWeight" class="row-input"></td>
+    <td><input type="number" value="${row.cartonWeight||''}" step="0.001" data-rid="${rid}" data-field="cartonWeight" class="row-input" style="background:#fff7ed" title="单个纸箱重量(kg)"></td>
+    <td><input type="text" value="${row.currency||''}" data-rid="${rid}" data-field="currency" class="row-input"></td>
+    <td style="text-align:center">
+      <button class="text-red-500 font-bold text-lg del-btn" data-rid="${rid}" title="删除">✕</button>
+    </td>
+  `;
+
+  // Attach input events via delegation on tr
+  tr.querySelectorAll('.row-input, .box-input').forEach(input => {
+    input.addEventListener('input', () => updateRow(input.dataset.rid, input.dataset.field, input.value));
+    input.addEventListener('change', () => updateRow(input.dataset.rid, input.dataset.field, input.value));
+  });
+  tr.querySelector('.del-btn').addEventListener('click', () => deleteRow(rid));
+  const imgUpload = tr.querySelector('.img-upload');
+  if (imgUpload) imgUpload.addEventListener('change', () => uploadImage(rid, imgUpload));
+
+  // Drag events — use tr as draggable, handle as visual indicator
+  tr.setAttribute('draggable', 'true');
+  tr.addEventListener('dragstart', e => {
+    dragSrcIdx = idx;
+    tr.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  tr.addEventListener('dragend', () => tr.classList.remove('dragging'));
+  tr.addEventListener('dragover', e => { e.preventDefault(); tr.classList.add('drag-over'); });
+  tr.addEventListener('dragleave', () => tr.classList.remove('drag-over'));
+  tr.addEventListener('drop', e => {
+    e.preventDefault();
+    tr.classList.remove('drag-over');
+    const targetIdx = idx;
+    if (dragSrcIdx === null || dragSrcIdx === targetIdx) return;
+    const moved = state.rows.splice(dragSrcIdx, 1)[0];
+    state.rows.splice(targetIdx, 0, moved);
+    dragSrcIdx = null;
+    renderTable();
+  });
+
+  return tr;
+}
+
+function updateRow(id, field, value) {
+  const row = state.rows.find(r => r.id === id);
+  if (!row) return;
+
+  // If field is a box column and row is in a group, update all group members
+  const boxFields = ['length','width','height','cartons','cbmPerCarton','totalCbm'];
+  if (boxFields.includes(field) && row.groupId !== null) {
+    state.rows.filter(r => r.groupId === row.groupId).forEach(r => { r[field] = value; });
+  } else {
+    row[field] = value;
+  }
+
+  // Recalculate
+  recalcRow(row);
+  // For group, recalc all
+  if (row.groupId !== null) {
+    state.rows.filter(r => r.groupId === row.groupId).forEach(r => recalcRow(r));
+  }
+
+  // Full re-render only when merge groupings actually change (category/supplier/exportCo/blHead)
+  // or when box group membership changes
+  const mergeKeyFields = ['category','supplier','exportCo','blHead'];
+  if (row.groupId !== null || mergeKeyFields.includes(field)) {
+    if (field === 'category') sortRowsByCategory();
+    renderTable();
+    return;
+  }
+
+  // For all other fields: update inputs in-place (no scroll jump),
+  // then also refresh any merged-total cells that cover this row
+  partialRefreshRow(id);
+  refreshMergedTotalsForRow(id);
+}
+
+// After an amount field changes, find the visual merge group master for this row
+// and update its merged total cell in-place (no full re-render).
+function refreshMergedTotalsForRow(id) {
+  const mergeInfo = computeMergeGroups();
+  // Find the master index for the row's merge group
+  const rowIdx = state.rows.findIndex(r => r.id === id);
+  if (rowIdx < 0) return;
+
+  // Walk back to find the master of this group
+  let masterIdx = rowIdx;
+  while (masterIdx > 0 && mergeInfo[masterIdx].hidden) masterIdx--;
+
+  const mi = mergeInfo[masterIdx];
+  if (mi.rowspan <= 1) return; // not in a merged group, nothing to update
+
+  const masterRow = state.rows[masterIdx];
+  const masterTr = document.querySelector(`tr[data-id="${masterRow.id}"]`);
+  if (!masterTr) return;
+
+  // The merged invoiceTotal and purchaseTotal cells have no data-field input inside them;
+  // they are plain text TDs. We identify them by their background color (#fef3c7 = amber).
+  // They are the 3rd and 7th merged TDs in the row (after invoiceAmount, supplier, poDate, poNo, purchaseAmount, purchaseTotal, exportCo, blHead).
+  // More reliably: find all TDs with the amber merged style and update their textContent.
+  const amberTds = [...masterTr.querySelectorAll('td')].filter(td =>
+    td.style.background === 'rgb(254, 243, 199)' || td.getAttribute('style')?.includes('#fef3c7')
+  );
+  if (amberTds[0]) amberTds[0].textContent = mi.invoiceTotalMerged || '';
+  if (amberTds[1]) amberTds[1].textContent = mi.purchaseTotalMerged || '';
+}
+
+function recalcRow(row) {
+  const qty = parseFloat(row.qty) || 0;
+  const pp = parseFloat(row.purchasePrice) || 0;
+  const ip = parseFloat(row.invoicePrice) || 0;
+  const uw = parseFloat(row.unitWeight) || 0;   // unit: grams
+  const cw = parseFloat(row.cartonWeight) || 0; // unit: kg per carton
+  const l = parseFloat(row.length) || 0;
+  const w = parseFloat(row.width) || 0;
+  const h = parseFloat(row.height) || 0;
+  const cartons = parseFloat(row.cartons) || 0;
+
+  // 送货KG重量 = 净重总重 = 送货数量 × 物料单重(g) ÷ 1000
+  const kgWeight = qty && uw ? qty * uw / 1000 : 0;
+  row.kgWeight = kgWeight ? kgWeight.toFixed(2) : '';
+
+  // 净重总重 = 送货KG重量；若无法计算则保留已有值（如从采购单导入的 一箱净重×箱数）
+  if (kgWeight) row.netWeightTotal = kgWeight.toFixed(2);
+
+  // 毛重总重 = 净重总重 + 箱数 × 纸箱重量；若无法计算则保留已有值
+  if (kgWeight) {
+    const gw = kgWeight + cartons * cw;
+    row.grossWeight = gw ? gw.toFixed(2) : '';
+  }
+
+  // 发票金额 = 发票单价 × 送货KG重量
+  row.invoiceAmount = kgWeight && ip ? (ip * kgWeight).toFixed(2) : '';
+
+  // 发票合计 = invoiceAmount (per row)
+  row.invoiceTotal = row.invoiceAmount || '';
+
+  // 采购金额 = 采购单价 × 送货KG重量
+  row.purchaseAmount = kgWeight && pp ? (pp * kgWeight).toFixed(2) : '';
+
+  // 采购总额 = purchaseAmount (per row, groups summed in export)
+  row.purchaseTotal = row.purchaseAmount || '';
+
+  // 立方数/每箱 = (长 × 宽 × 高) / 28316.75 × 0.0283，保留2位小数
+  if (l && w && h) {
+    row.cbmPerCarton = (l * w * h / 28316.75 * 0.0283).toFixed(2);
+  } else { row.cbmPerCarton = ''; }
+
+  // 总立方数 = 立方数/每箱 × 箱数，保留2位小数
+  row.totalCbm = (row.cbmPerCarton && cartons) ? (parseFloat(row.cbmPerCarton) * cartons).toFixed(2) : '';
+}
+
+function partialRefreshRow(id) {
+  const tr = document.querySelector(`tr[data-id="${id}"]`);
+  if (!tr) { renderTable(); return; }
+  const row = state.rows.find(r => r.id === id);
+  if (!row) return;
+  // Update all inputs (both editable and readonly) by data-field without rebuilding the tr
+  tr.querySelectorAll('input[data-field]').forEach(inp => {
+    if (inp.value !== String(row[inp.dataset.field] || '')) {
+      inp.value = row[inp.dataset.field] || '';
+    }
+  });
+}
+
+function deleteRow(id) {
+  state.rows = state.rows.filter(r => r.id !== id);
+  renderTable();
+}
+
+function addRow() {
+  state.rows.push(createRow({ itemNo: state.selectedItems[0] || '', nameCN:'', nameEN:'', spec:'', category:'', unit:'', image:'', usage:'', invoicePrice:'', supplier:'', purchasePrice:'', exportCo:'', blHead:'', materialCode:'', unitWeight:'', netWeight:'', cartonWeight:'', currency:'', hscodeChina:'', hscodeIndonesia:'', contractNo:'', contractDate:'', invoiceNo:'', invoiceDate:'', poDate:'', poNo:'' }));
+  sortRowsByCategory();
+  renderTable();
+}
+
+function toggleSelectAll(cb) {
+  document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
+}
+function onRowCheck() {}
+
+// Box Merge
+function mergeSelectedBoxes() {
+  const checked = [...document.querySelectorAll('.row-check:checked')].map(c => c.dataset.id);
+  if (checked.length < 2) return alert('请至少选中2行再合并');
+  const gid = state.groupCounter++;
+  state.rows.filter(r => checked.includes(r.id)).forEach(r => { r.groupId = gid; });
+  renderTable();
+}
+
+function unmergeSelected() {
+  const checked = [...document.querySelectorAll('.row-check:checked')].map(c => c.dataset.id);
+  state.rows.filter(r => checked.includes(r.id)).forEach(r => { r.groupId = null; });
+  renderTable();
+}
+
+function uploadImage(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const row = state.rows.find(r => r.id === id);
+    if (row) { row.image = e.target.result; partialRefreshRow(id); }
+  };
+  reader.readAsDataURL(file);
+}
+
+// ============================================================
+//  PURCHASE ORDER IMPORT
+// ============================================================
+
+// Match rule: itemNo must be exact; then nameCN fuzzy (system name contains PO keyword)
+function matchesPORow(stateRow, poItemNo, poNameCN) {
+  if (!poItemNo || stateRow.itemNo !== poItemNo) return false;
+  if (!poNameCN) return true; // only itemNo required if no name in PO
+  const sysName = (stateRow.nameCN || '').trim();
+  const poName  = poNameCN.trim();
+  // fuzzy: system name contains the PO name keyword (or vice versa as fallback)
+  return sysName.includes(poName) || poName.includes(sysName);
+}
+
+function importPurchaseOrder(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+    // Collect data from all non-system sheets
+    let data = [];
+    wb.SheetNames.forEach(sn => {
+      if (sn.startsWith('WpsReserved')) return;
+      const ws = wb.Sheets[sn];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      data.push(...rows);
+    });
+    if (!data.length) return alert('文件为空或格式不支持');
+    const colMap = detectColumns(Object.keys(data[0]));
+    let filled = 0;
+    let dimWarnShown = false;
+    // Forward-fill state for merged cells (转印尼产品装箱明细 format)
+    let lastSupplier = '', lastPoDate = '', lastPoNo = '', lastBlHead = '';
+
+    data.forEach(poRow => {
+      const poItemNo = String(poRow[colMap.itemNo]  || '').trim();
+      const poNameCN = String(poRow[colMap.nameCN]  || '').trim();
+      const qty      = poRow[colMap.qty];
+      const price    = poRow[colMap.price];
+      const grossW   = poRow[colMap.grossWeight];    // 毛重总重列（如有）
+      const netW     = poRow[colMap.netWeight];      // 净重总重列（如有）
+      // 每箱重量及物料单重（转印尼产品装箱明细格式）
+      const rawUnitWeight  = colMap.unitWeight            ? poRow[colMap.unitWeight]            : undefined;
+      const rawPerCartonGross = colMap.grossWeightPerCarton ? poRow[colMap.grossWeightPerCarton] : undefined;
+      const rawPerCartonNet   = colMap.netWeightPerCarton   ? poRow[colMap.netWeightPerCarton]   : undefined;
+      const rawCartonW  = colMap.cartonWeight ? poRow[colMap.cartonWeight] : undefined;
+      // Forward-fill: use previous row's value if current cell is empty (merged cell pattern)
+      const rawSupplier = colMap.supplier    ? String(poRow[colMap.supplier]    || '').trim() : '';
+      const rawPoDate   = colMap.poDate      ? String(poRow[colMap.poDate]      || '').trim() : '';
+      const rawPoNo     = colMap.poNo        ? String(poRow[colMap.poNo]        || '').trim() : '';
+      const rawBlHead   = colMap.blHead      ? String(poRow[colMap.blHead]      || '').trim() : '';
+      if (rawSupplier) lastSupplier = rawSupplier;
+      if (rawPoDate)   lastPoDate   = rawPoDate;
+      if (rawPoNo)     lastPoNo     = rawPoNo;
+      if (rawBlHead)   lastBlHead   = rawBlHead;
+      const fillSupplier    = lastSupplier;
+      const fillPoDate      = lastPoDate;
+      const fillPoNo        = lastPoNo;
+      const fillBlHead      = lastBlHead;
+
+      // ── 箱数严格提取 ─────────────────────────────────────────
+      // Only from cartons-mapped column; ignore any content with dim separators
+      let cartonsVal = null;
+      if (colMap.cartons) {
+        const rawCtns = poRow[colMap.cartons];
+        const parsed = extractCartonsAndDim(rawCtns);
+        if (parsed.hasDimSep && !dimWarnShown) {
+          dimWarnShown = true;
+          setTimeout(() => alert('箱数字段识别到尺寸格式内容，请检查采购单数据'), 100);
+        }
+        // If cell contains both carton count and dim (e.g. "10箱 50*40*30"), take only the count
+        cartonsVal = parsed.cartons;
+        // If the entire cell is a pure dimension string (no leading number), treat as no carton data
+      }
+
+      // ── 纸箱尺寸严格提取 ──────────────────────────────────────
+      // Priority 1: individual length/width/height columns (no dim separator in header)
+      let resolvedLen = null, resolvedWid = null, resolvedHgt = null;
+
+      const rawLen = colMap.length ? String(poRow[colMap.length] || '').trim() : '';
+      const rawWid = colMap.width  ? String(poRow[colMap.width]  || '').trim() : '';
+      const rawHgt = colMap.height ? String(poRow[colMap.height] || '').trim() : '';
+
+      if (rawLen && !DIM_SEP_RE.test(rawLen)) resolvedLen = rawLen;
+      if (rawWid && !DIM_SEP_RE.test(rawWid)) resolvedWid = rawWid;
+      if (rawHgt && !DIM_SEP_RE.test(rawHgt)) resolvedHgt = rawHgt;
+
+      // Priority 2: combined "dimensions" column — parse L*W*H triplet
+      if (!resolvedLen && !resolvedWid && !resolvedHgt && colMap.dimensions) {
+        const dimRaw = poRow[colMap.dimensions];
+        const dimParsed = parseDimensions(dimRaw);
+        if (dimParsed) {
+          resolvedLen = dimParsed.length;
+          resolvedWid = dimParsed.width;
+          resolvedHgt = dimParsed.height;
+        }
+      }
+
+      // Priority 3: if cartons column had a mixed cell (e.g. "10箱 50*40*30"),
+      // also extract the dimension part from it when no other dim source found
+      if (!resolvedLen && !resolvedWid && !resolvedHgt && colMap.cartons) {
+        const rawCtns = poRow[colMap.cartons];
+        const parsed  = extractCartonsAndDim(rawCtns);
+        if (parsed.dimPart) {
+          const dimParsed = parseDimensions(parsed.dimPart);
+          if (dimParsed) {
+            resolvedLen = dimParsed.length;
+            resolvedWid = dimParsed.width;
+            resolvedHgt = dimParsed.height;
+          }
+        }
+      }
+
+      // ── Fill matching rows ─────────────────────────────────────
+      state.rows.forEach(row => {
+        if (!matchesPORow(row, poItemNo, poNameCN)) return;
+        let changed = false;
+        if (qty      !== undefined && qty      !== '') { row.qty            = qty;            changed = true; }
+        if (price    !== undefined && price    !== '') { row.purchasePrice  = price;          changed = true; }
+        if (grossW   !== undefined && grossW   !== '') { row.grossWeight    = String(grossW); changed = true; }
+        if (netW     !== undefined && netW     !== '') { row.netWeightTotal = String(netW);   changed = true; }
+        // 箱数 — only from the cartons col, only if it's a clean number
+        if (cartonsVal !== null) { row.cartons = cartonsVal; changed = true; }
+        // 纸箱尺寸 — only from dim-detected sources, never from cartons col directly
+        if (resolvedLen) { row.length = String(resolvedLen); changed = true; }
+        if (resolvedWid) { row.width  = String(resolvedWid); changed = true; }
+        if (resolvedHgt) { row.height = String(resolvedHgt); changed = true; }
+        // 采购单/提单信息（含前向填充处理合并单元格）
+        if (fillSupplier) { row.supplier    = fillSupplier; changed = true; }
+        if (fillPoDate)   { row.poDate      = fillPoDate;   changed = true; }
+        if (fillPoNo)     { row.poNo        = fillPoNo;     changed = true; }
+        if (fillBlHead)   { row.blHead      = fillBlHead;   changed = true; }
+        if (rawCartonW !== undefined && rawCartonW !== '') { row.cartonWeight = String(rawCartonW); changed = true; }
+        // 物料单重（影响kgWeight自动计算）
+        if (rawUnitWeight !== undefined && rawUnitWeight !== '') { row.unitWeight = String(rawUnitWeight); changed = true; }
+        // 每箱毛重/净重 × 总箱数 = 总重量（仅当无法自动计算时采用，即unitWeight为空）
+        if (rawPerCartonGross !== undefined && rawPerCartonGross !== '' && cartonsVal) {
+          const total = parseFloat(rawPerCartonGross) * parseFloat(cartonsVal);
+          if (!isNaN(total) && total > 0) { row.grossWeight = total.toFixed(2); changed = true; }
+        }
+        if (rawPerCartonNet !== undefined && rawPerCartonNet !== '' && cartonsVal) {
+          const total = parseFloat(rawPerCartonNet) * parseFloat(cartonsVal);
+          if (!isNaN(total) && total > 0) { row.netWeightTotal = total.toFixed(2); changed = true; }
+        }
+        if (changed) { row.autofilled = true; filled++; recalcRow(row); }
+      });
+    });
+    renderTable();
+    alert(`采购单导入完成，已自动填充 ${filled} 行数据（灰色底色表示自动填充，可直接修改）`);
+  };
+  reader.readAsArrayBuffer(file);
+  input.value = '';
+}
+
+// Fuzzy column detection
+const COL_ALIASES = {
+  itemNo:       ['item no','itemno','货号','品号','item number','item_no','料号'],
+  nameCN:       ['产品中文名称','中文名称','产品名称','品名','中文品名','chinese name','product name','物料名称'],
+  matCode:      ['material code','materialcode','物料编码','物料号','mat code','mat_code','物料代码'],
+  qty:          ['送货数量','订单数量','出货数','建议送货数量','建议数量','order qty','qty','数量','quantity'],
+  price:        ['采购单价','purchase price','单价（港币）','单价(港币)','采购价','unit price','purchase_price'],
+  supplier:     ['supplier','供应商','供货商','vendor'],
+  spec:         ['specification','规格','spec','型号'],
+  currency:     ['currency','币种','货币','currency type','币别'],
+  // 合计重量列（严格匹配"总"字防止误匹配"一箱"列）
+  grossWeight:  ['毛重总重','总毛重','total gross','gross weight','gross_weight','gross(kg)','毛重(kg)'],
+  netWeight:    ['净重总重','总净重','total net','net weight','net_weight','net(kg)','净重(kg)'],
+  // 箱数专用关键词：严格匹配箱数相关列名，不含尺寸分隔符关键词
+  cartons:      ['总箱数','箱数','carton no.','carton no','carton qty','件数','ctns','ctn数'],
+  // 独立长宽高列（当采购单拆分为三列时使用）
+  length:       ['长(cm)','长度(cm)','l(cm)','length(cm)'],
+  width:        ['宽(cm)','宽度(cm)','w(cm)','width(cm)'],
+  height:       ['高(cm)','高度(cm)','h(cm)','height(cm)'],
+  // 合并尺寸列：包含分隔符或明确为尺寸列名
+  dimensions:   ['纸箱尺寸','长宽高','外箱尺寸','箱规','箱尺寸','l*w*h','l×w×h','size(cm)','carton size','box size','dimensions','尺寸'],
+  // 采购单/提单相关字段（对应转印尼产品装箱明细.xlsx）
+  poDate:       ['采购单日期','date of purchase order','po date','po_date'],
+  poNo:         ['采购单号','po no.','po no','po number','po_no'],
+  blHead:       ['甲方（下单抬头）','甲方','提单抬头','bill of lading','bl head'],
+  cartonWeight: ['纸箱重量','carton weight','箱重','纸箱重量(kg)','box weight'],
+  // 物料单重及每箱重量（转印尼产品装箱明细.xlsx 格式）
+  unitWeight:   ['单重g','单重(g)','物料单重','unit weight(g)','重量g','重量(g)'],
+  grossWeightPerCarton: ['一箱毛重kg','一箱毛重','gross weight per carton','per carton gross'],
+  netWeightPerCarton:   ['一箱净重kg','一箱净重','net weight per carton','per carton net'],
+};
+
+// 专用列名检测：dimensions 列名必须包含尺寸相关关键词，
+// cartons 列名不能匹配尺寸列关键词（防止含 * 的合并列被误判为箱数）
+function detectColumns(headers) {
+  const result = {};
+  const DIM_SEP = /[*×xX]/;
+  const normalizeH = h => h.toLowerCase().replace(/\s+/g, '');
+
+  Object.entries(COL_ALIASES).forEach(([key, aliases]) => {
+    let found = null;
+    for (const h of headers) {
+      const hn = normalizeH(h);
+      const matched = aliases.some(a => hn.includes(a.toLowerCase().replace(/\s+/g, '')));
+      if (!matched) continue;
+      // For cartons: reject if the header itself contains dimension separators
+      if (key === 'cartons' && DIM_SEP.test(h)) continue;
+      // For length/width/height standalone: reject if header looks like a combined dimension col
+      if ((key === 'length' || key === 'width' || key === 'height') && DIM_SEP.test(h)) continue;
+      found = h;
+      break;
+    }
+    result[key] = found || null;
+  });
+
+  // Fallback: for length/width/height use broader aliases only if no dimensions col was found
+  if (!result.dimensions) {
+    const fallbackAliases = {
+      length: ['长','length','长度','l cm'],
+      width:  ['宽','width','宽度','w cm'],
+      height: ['高','height','高度','h cm'],
+    };
+    ['length','width','height'].forEach(key => {
+      if (!result[key]) {
+        const hn_list = headers.map(h => ({ h, hn: h.toLowerCase().replace(/\s+/g,'') }));
+        const fallback = fallbackAliases[key];
+        const found = hn_list.find(({ h, hn }) => !DIM_SEP.test(h) && fallback.some(a => hn.includes(a)));
+        result[key] = found ? found.h : null;
+      }
+    });
+  }
+
+  return result;
+}
+
+const DIM_SEP_RE = /[*×xX]/;
+
+// Parse a combined "长*宽*高" cell into {length, width, height}.
+// Supports separators: * x X × and optional surrounding spaces.
+// Returns null if the value doesn't look like a dimension triplet.
+function parseDimensions(val) {
+  if (val === null || val === undefined) return null;
+  const s = String(val).trim();
+  if (!s) return null;
+  // Split on any of: * × x X (case-insensitive), with optional spaces around them
+  const parts = s.split(/\s*[*×xX]\s*/);
+  if (parts.length !== 3) return null;
+  const nums = parts.map(p => parseFloat(p.trim()));
+  if (nums.some(n => isNaN(n) || n <= 0)) return null;
+  return { length: String(nums[0]), width: String(nums[1]), height: String(nums[2]) };
+}
+
+// Extract carton count from a raw cell value.
+// If the cell contains dimension separators (e.g. "50*40*30"), returns null (not a count).
+// If the cell contains both a leading number AND dimension content (e.g. "10箱 50*40*30"),
+//   returns the leading number as carton count and also returns the dimension part.
+// Result: { cartons: string|null, dimPart: string|null, hasDimSep: boolean }
+function extractCartonsAndDim(raw) {
+  if (raw === null || raw === undefined || raw === '') return { cartons: null, dimPart: null, hasDimSep: false };
+  const s = String(raw).trim();
+  const hasDimSep = DIM_SEP_RE.test(s);
+
+  if (!hasDimSep) {
+    // Pure numeric or text without separators — try to parse as carton count
+    const n = parseFloat(s);
+    return { cartons: (!isNaN(n) && n > 0) ? String(n) : null, dimPart: null, hasDimSep: false };
+  }
+
+  // Has dimension separator — check if there's a leading number before the dim string
+  // Pattern: optional leading digits (carton count) followed by non-numeric chars then the dim triplet
+  const leadingNumMatch = s.match(/^(\d+(?:\.\d+)?)\s*[^\d*×xX]/);
+  const dimTripletMatch  = s.match(/(\d+(?:\.\d+)?)\s*[*×xX]\s*(\d+(?:\.\d+)?)\s*[*×xX]\s*(\d+(?:\.\d+)?)/);
+
+  let cartonsVal = null;
+  let dimPart    = null;
+
+  if (dimTripletMatch) {
+    dimPart = dimTripletMatch[0]; // the "L*W*H" substring
+  }
+
+  if (leadingNumMatch) {
+    const candidate = parseFloat(leadingNumMatch[1]);
+    // Only treat as carton count if it precedes the dim triplet (not part of it)
+    if (dimTripletMatch && !dimTripletMatch[0].startsWith(leadingNumMatch[1])) {
+      cartonsVal = String(candidate);
+    }
+  }
+
+  return { cartons: cartonsVal, dimPart, hasDimSep: true };
+}
+
+// ============================================================
+//  TEMPLATES
+// ============================================================
+function saveTemplate() {
+  if (!state.selectedCustomer) return alert('请先完成客人和货号的选择');
+  showModal('modal-save-tpl');
+  document.getElementById('tpl-name').value = '';
+}
+
+function doSaveTemplate() {
+  const name = document.getElementById('tpl-name').value.trim();
+  if (!name) return alert('请输入模板名称');
+  const tpls = LS.get('templates') || [];
+  tpls.push({
+    name,
+    customer: state.selectedCustomer,
+    items: [...state.selectedItems],
+    rows: JSON.parse(JSON.stringify(state.rows)),
+    createdAt: new Date().toLocaleDateString('zh-CN'),
+  });
+  LS.set('templates', tpls);
+  closeModal('modal-save-tpl');
+  alert('模板已保存：' + name);
+}
+
+function loadTemplateModal() {
+  const tpls = LS.get('templates') || [];
+  const el = document.getElementById('template-list');
+  if (!tpls.length) {
+    el.innerHTML = '<div class="text-gray-400 text-center py-4">暂无保存的模板</div>';
+  } else {
+    el.innerHTML = tpls.map((t, i) => `
+      <div class="flex items-center justify-between border border-gray-200 rounded-lg p-3 mb-2">
+        <div>
+          <div class="font-semibold">${t.name}</div>
+          <div class="text-sm text-gray-500">客人：${t.customer}　货号：${(t.items||[]).join('、')}　${t.createdAt||''}</div>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-primary btn-sm text-sm px-3 py-1" onclick="applyTemplate(${i})">加载</button>
+          <button class="btn btn-danger btn-sm text-sm px-3 py-1" onclick="deleteTemplate(${i})">删除</button>
+        </div>
+      </div>
+    `).join('');
+  }
+  showModal('modal-template');
+}
+
+function applyTemplate(i) {
+  const tpls = LS.get('templates') || [];
+  const t = tpls[i];
+  state.selectedCustomer = t.customer;
+  state.selectedItems = [...(t.items||[])];
+  state.rows = JSON.parse(JSON.stringify(t.rows||[]));
+  closeModal('modal-template');
+  updateHeader();
+  goStep(3);
+}
+
+function deleteTemplate(i) {
+  if (!confirm('确认删除此模板？')) return;
+  const tpls = LS.get('templates') || [];
+  tpls.splice(i, 1);
+  LS.set('templates', tpls);
+  loadTemplateModal();
+}
+
+// ============================================================
+//  MATERIAL MANAGER (CRUD)
+// ============================================================
+const MAT_FIELDS = [
+  ['itemNo','货号'],['materialCode','物料编码'],['nameCN','中文名称'],['nameEN','英文名称'],
+  ['spec','规格'],['category','类别'],['unit','单位'],
+  ['unitWeight','物料单重(g)'],['netWeight','净重(kg)'],['cartonWeight','纸箱重(kg)'],
+  ['invoicePrice','发票单价'],['purchasePrice','采购单价'],
+  ['supplier','供应商'],['exportCo','报关出口公司'],['blHead','提单抬头'],
+  ['currency','币种'],['usage','产品用途'],['hscodeChina','中国HSCODE'],['hscodeIndonesia','印尼HSCODE'],
+];
+
+let _editingMatIdx = null; // index of row currently in edit mode
+
+function openMaterialsManager() {
+  _editingMatIdx = null;
+  renderMaterialsManager();
+  showModal('modal-manage-materials');
+}
+
+function renderMaterialsManager() {
+  const query = (document.getElementById('mat-search')?.value || '').toLowerCase().trim();
+  const mats = LS.get('materials') || [];
+  const filtered = query
+    ? mats.map((m, i) => ({ m, i })).filter(({ m }) =>
+        (m.itemNo||'').toLowerCase().includes(query) ||
+        (m.nameCN||'').toLowerCase().includes(query) ||
+        (m.materialCode||'').toLowerCase().includes(query)
+      )
+    : mats.map((m, i) => ({ m, i }));
+
+  const tbody = document.getElementById('mat-manager-tbody');
+  tbody.innerHTML = filtered.map(({ m, i }) => {
+    if (_editingMatIdx === i) {
+      // Edit row
+      return `<tr style="background:#eff6ff">
+        ${MAT_FIELDS.map(([f]) => `<td><input type="text" value="${(m[f]||'').toString().replace(/"/g,'&quot;')}"
+          style="width:100%;border:1px solid #93c5fd;border-radius:3px;padding:2px 4px;font-size:12px"
+          onchange="updateEditingMat(${i},'${f}',this.value)"></td>`).join('')}
+        <td style="white-space:nowrap">
+          <button class="btn btn-success" style="font-size:11px;padding:2px 8px" onclick="saveEditingMat(${i})">保存</button>
+          <button class="btn btn-gray" style="font-size:11px;padding:2px 8px;margin-left:2px" onclick="cancelEditMat()">取消</button>
+        </td>
+      </tr>`;
+    }
+    return `<tr>
+      ${MAT_FIELDS.map(([f]) => `<td style="padding:4px 6px">${(m[f]||'').toString().replace(/</g,'&lt;')}</td>`).join('')}
+      <td style="white-space:nowrap;padding:4px 6px">
+        <button class="btn btn-outline" style="font-size:11px;padding:2px 8px" onclick="startEditMat(${i})">编辑</button>
+        <button class="btn btn-danger" style="font-size:11px;padding:2px 8px;margin-left:2px" onclick="deleteMatByIdx(${i})">删除</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('mat-manager-count').textContent =
+    `共 ${mats.length} 条物料${query ? `，筛选显示 ${filtered.length} 条` : ''}`;
+}
+
+function startEditMat(i) {
+  _editingMatIdx = i;
+  renderMaterialsManager();
+}
+
+function cancelEditMat() {
+  _editingMatIdx = null;
+  renderMaterialsManager();
+}
+
+function updateEditingMat(i, field, val) {
+  const mats = LS.get('materials') || [];
+  if (!mats[i]) return;
+  mats[i][field] = val;
+  LS.set('materials', mats);
+}
+
+function saveEditingMat(i) {
+  _editingMatIdx = null;
+  renderMaterialsManager();
+  renderItems(); // refresh step 2 list
+}
+
+function deleteMatByIdx(i) {
+  if (!confirm('确认删除此物料？')) return;
+  const mats = LS.get('materials') || [];
+  mats.splice(i, 1);
+  LS.set('materials', mats);
+  renderMaterialsManager();
+  renderItems();
+}
+
+function openAddMatRow() {
+  document.getElementById('mat-add-form').classList.remove('hidden');
+  // Clear all fields
+  ['itemNo','materialCode','nameCN','nameEN','spec','category','unit','unitWeight','netWeight',
+   'cartonWeight','invoicePrice','purchasePrice','supplier','exportCo','blHead','currency','usage',
+   'hscodeChina','hscodeIndonesia'].forEach(f => {
+    const el = document.getElementById('madd-' + f);
+    if (el) el.value = '';
+  });
+}
+
+function closeAddMatRow() {
+  document.getElementById('mat-add-form').classList.add('hidden');
+}
+
+function confirmAddMatRow() {
+  const get = id => (document.getElementById('madd-' + id)?.value || '').trim();
+  const itemNo = get('itemNo');
+  const materialCode = get('materialCode');
+  if (!itemNo) return alert('货号不能为空');
+  if (!materialCode) return alert('物料编码不能为空');
+  const mats = LS.get('materials') || [];
+  const newMat = {};
+  ['itemNo','materialCode','nameCN','nameEN','spec','category','unit','unitWeight','netWeight',
+   'cartonWeight','invoicePrice','purchasePrice','supplier','exportCo','blHead','currency','usage',
+   'hscodeChina','hscodeIndonesia'].forEach(f => { newMat[f] = get(f); });
+  mats.push(newMat);
+  LS.set('materials', mats);
+  closeAddMatRow();
+  renderMaterialsManager();
+  renderItems();
+}
+
+
+
+// ============================================================
+//  STEP 4: SELF-CHECK
+// ============================================================
+function runSelfCheck() {
+  const warnings = [];
+  const rows = state.rows;
+
+  if (!rows.length) {
+    document.getElementById('self-check-items').innerHTML = '<span class="text-gray-400">暂无物料行，请先在第三步填写数据。</span>';
+    return;
+  }
+
+  // --- Helper ---
+  const label = r => `【${r.itemNo || '?'}·${r.nameCN || '?'}】`;
+  const num = v => parseFloat(v) || 0;
+
+  // --- 1. 必填项检查 ---
+  const REQUIRED = [
+    ['itemNo',   '货号'],
+    ['nameCN',   '中文名称'],
+    ['supplier', '供应商'],
+    ['cartons',  '箱数'],
+    ['length',   '长'],
+    ['width',    '宽'],
+    ['height',   '高'],
+  ];
+  rows.forEach(r => {
+    // For box-group slaves, skip box-dimension fields (they inherit from master)
+    const groupRows = r.groupId !== null ? rows.filter(x => x.groupId === r.groupId) : [];
+    const isSlave = r.groupId !== null && groupRows.length > 0 && groupRows[0].id !== r.id;
+    REQUIRED.forEach(([field, fieldLabel]) => {
+      if (isSlave && ['cartons','length','width','height'].includes(field)) return;
+      const val = (r[field] || '').toString().trim();
+      if (!val) warnings.push({ level: 'error', msg: `${label(r)} 的【${fieldLabel}】未填写，请检查` });
+    });
+  });
+
+  // --- 2. 基础逻辑检查 ---
+  rows.forEach(r => {
+    const gross = num(r.grossWeight);
+    const net   = num(r.netWeightTotal);
+    if (gross > 0 && net > 0 && gross < net) {
+      warnings.push({ level: 'error', msg: `${label(r)} 毛重(${gross}) 小于净重(${net})，不符合逻辑，请检查` });
+    }
+
+    [['cartons','箱数'],['qty','送货数量'],['length','长'],['width','宽'],['height','高']].forEach(([f, fl]) => {
+      const v = num(r[f]);
+      if (r[f] !== '' && r[f] !== null && r[f] !== undefined && v <= 0) {
+        warnings.push({ level: 'warn', msg: `${label(r)} 的【${fl}】为 0 或负数，请检查` });
+      }
+    });
+
+    [['invoicePrice','发票单价'],['purchasePrice','采购单价']].forEach(([f, fl]) => {
+      const v = num(r[f]);
+      if (r[f] !== '' && r[f] !== null && r[f] !== undefined && v === 0) {
+        warnings.push({ level: 'warn', msg: `${label(r)} 的【${fl}】为 0，请检查是否填错` });
+      }
+    });
+  });
+
+  // --- 3. 同货号历史价格/单重异常检查 ---
+  // Group by itemNo among current rows
+  const byItem = {};
+  rows.forEach(r => {
+    if (!r.itemNo) return;
+    if (!byItem[r.itemNo]) byItem[r.itemNo] = [];
+    byItem[r.itemNo].push(r);
+  });
+
+  Object.values(byItem).forEach(group => {
+    if (group.length < 2) return; // need at least 2 rows of same itemNo to compare
+
+    // Purchase price check
+    const prices = group.map(r => num(r.purchasePrice)).filter(v => v > 0);
+    if (prices.length >= 2) {
+      const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+      group.forEach(r => {
+        const p = num(r.purchasePrice);
+        if (p > 0 && avg > 0 && (p > avg * 1.5 || p < avg * 0.5)) {
+          warnings.push({ level: 'warn', msg: `${label(r)} 采购单价(${p}) 与同货号平均单价(${avg.toFixed(2)}) 差异超过50%，请确认` });
+        }
+      });
+    }
+
+    // Invoice price check
+    const iprices = group.map(r => num(r.invoicePrice)).filter(v => v > 0);
+    if (iprices.length >= 2) {
+      const avg = iprices.reduce((a, b) => a + b, 0) / iprices.length;
+      group.forEach(r => {
+        const p = num(r.invoicePrice);
+        if (p > 0 && avg > 0 && (p > avg * 1.5 || p < avg * 0.5)) {
+          warnings.push({ level: 'warn', msg: `${label(r)} 发票单价(${p}) 与同货号平均单价(${avg.toFixed(2)}) 差异超过50%，请确认` });
+        }
+      });
+    }
+
+    // Unit weight check
+    const weights = group.map(r => num(r.unitWeight)).filter(v => v > 0);
+    if (weights.length >= 2) {
+      const avg = weights.reduce((a, b) => a + b, 0) / weights.length;
+      group.forEach(r => {
+        const w = num(r.unitWeight);
+        if (w > 0 && avg > 0 && (w > avg * 1.5 || w < avg * 0.5)) {
+          warnings.push({ level: 'warn', msg: `${label(r)} 物料单重(${w}g) 与同货号平均单重(${avg.toFixed(1)}g) 差异超过50%，请确认` });
+        }
+      });
+    }
+  });
+
+  // --- 4. 业务异常检查 ---
+  // Total CBM
+  const totalCbm = rows.reduce((sum, r) => sum + num(r.totalCbm), 0);
+  if (totalCbm > 58) {
+    warnings.push({ level: 'warn', msg: `当前总立方数为 ${totalCbm.toFixed(2)} CBM，超过常规40尺柜容量(58 CBM)，是否需要分柜？` });
+  }
+
+  // Duplicate rows (same itemNo + nameCN)
+  const seen = {};
+  rows.forEach(r => {
+    const key = (r.itemNo || '') + '|||' + (r.nameCN || '');
+    if (!key || key === '|||') return;
+    seen[key] = (seen[key] || 0) + 1;
+  });
+  Object.entries(seen).forEach(([key, cnt]) => {
+    if (cnt > 1) {
+      const [no, cn] = key.split('|||');
+      warnings.push({ level: 'warn', msg: `检测到重复的物料行（货号 ${no}·${cn}）共 ${cnt} 行，是否重复添加了？` });
+    }
+  });
+
+  // Qty vs demand qty (if demandQty field exists and is set)
+  // The field "demandQty" isn't in the current model, so skip this for now —
+  // but we can warn if qty seems unreasonably large compared to unitWeight-based expectation.
+  // Per spec: "送货数量比需求数量大100%以上" — needs a demandQty field. Since it doesn't exist,
+  // warn instead if qty is suspiciously large (>99999) as a proxy.
+  rows.forEach(r => {
+    const q = num(r.qty);
+    if (q > 99999) {
+      warnings.push({ level: 'warn', msg: `${label(r)} 送货数量(${q}) 异常偏大，请确认是否填错` });
+    }
+  });
+
+  // --- Render ---
+  const el = document.getElementById('self-check-items');
+  if (!warnings.length) {
+    el.innerHTML = '<span class="text-green-600 font-semibold">✅ 未发现异常，数据看起来正常。</span>';
+    return;
+  }
+
+  const icon = { error: '🔴', warn: '🟡' };
+  el.innerHTML = warnings.map(w =>
+    `<div class="py-1 border-b border-amber-100 last:border-0">
+      <span class="mr-1">${icon[w.level]||'⚪'}</span>${w.msg}
+    </div>`
+  ).join('');
+}
+
+// ============================================================
+//  STEP 4: VERIFICATION
+// ============================================================
+let verifyImportedData = [];
+let verifyImportedFiles = [];
+
+function importVerifyFiles(input) {
+  verifyImportedFiles = [];
+  verifyImportedData = [];
+  const files = Array.from(input.files);
+  let pending = files.length;
+  if (!pending) return;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      // Read all non-system sheets (转印尼产品装箱明细 has multiple date-based sheets)
+      wb.SheetNames.forEach(sn => {
+        if (sn.startsWith('WpsReserved')) return;
+        const ws = wb.Sheets[sn];
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+        if (!rows.length) return;
+        // Forward-fill merged cells for supplier/PO info
+        const colMap = detectColumns(Object.keys(rows[0]));
+        let lastSupplier = '', lastPoNo = '', lastBlHead = '', lastPoDate = '';
+        rows.forEach(row => {
+          const s = colMap.supplier ? String(row[colMap.supplier] || '').trim() : '';
+          const p = colMap.poNo     ? String(row[colMap.poNo]     || '').trim() : '';
+          const b = colMap.blHead   ? String(row[colMap.blHead]   || '').trim() : '';
+          const d = colMap.poDate   ? String(row[colMap.poDate]   || '').trim() : '';
+          if (s) lastSupplier = s;
+          if (p) lastPoNo = p;
+          if (b) lastBlHead = b;
+          if (d) lastPoDate = d;
+          row.__supplier = lastSupplier;
+          row.__poNo     = lastPoNo;
+          row.__blHead   = lastBlHead;
+          row.__poDate   = lastPoDate;
+        });
+        verifyImportedData.push(...rows);
+      });
+      verifyImportedFiles.push(file.name);
+      pending--;
+      if (pending === 0) {
+        document.getElementById('verify-files-list').innerHTML =
+          `<span class="text-green-600">✓ 已导入：</span>${verifyImportedFiles.join('、')}（共 ${verifyImportedData.length} 行数据）`;
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
+  input.value = '';
+}
+
+function runVerification() {
+  if (!verifyImportedData.length) return alert('请先导入核对文件');
+  const headers = Object.keys(verifyImportedData[0] || {});
+  const colMap = detectColumns(headers);
+
+  // Build lookup: key = itemNo, value = array of rows (may have multiple rows per itemNo)
+  // We'll do a linear match per state.row using matchesPORow
+  const cell = (r, key) => (key && r[key] !== undefined ? String(r[key]).trim() : null);
+  const importRows = verifyImportedData.map(r => ({
+    _raw: r,
+    itemNo:   String(r[colMap.itemNo]  || '').trim(),
+    nameCN:   String(r[colMap.nameCN]  || '').trim(),
+    qty:          cell(r, colMap.qty),
+    price:        cell(r, colMap.price),
+    // supplier/poNo/poDate/blHead: prefer forward-filled __fields (set during importVerifyFiles) over raw cell
+    supplier:     r.__supplier || cell(r, colMap.supplier) || null,
+    poNo:         r.__poNo     || cell(r, colMap.poNo)     || null,
+    poDate:       r.__poDate   || cell(r, colMap.poDate)   || null,
+    blHead:       r.__blHead   || cell(r, colMap.blHead)   || null,
+    spec:         cell(r, colMap.spec),
+    currency:     cell(r, colMap.currency),
+    cartons:      cell(r, colMap.cartons),
+    length:       cell(r, colMap.length),
+    width:        cell(r, colMap.width),
+    height:       cell(r, colMap.height),
+    grossWeight:  cell(r, colMap.grossWeight),
+    netWeight:    cell(r, colMap.netWeight),
+    cartonWeight: cell(r, colMap.cartonWeight),
+  }));
+
+  // 数值近似比较（避免浮点 0.001 级别误差导致误报）
+  const numEq = (a, b, eps = 0.01) => {
+    const x = parseFloat(a), y = parseFloat(b);
+    if (isNaN(x) || isNaN(y)) return String(a||'').trim() === String(b||'').trim();
+    return Math.abs(x - y) <= eps;
+  };
+  // 文本比较（忽略首尾空格）
+  const txtEq = (a, b) => String(a||'').trim() === String(b||'').trim();
+
+  const usedImportIdxs = new Set();
+  let matched = 0, mismatched = 0, missing = 0;
+  const errorList = [];
+
+  state.verifyResult = state.rows.map((row, idx) => {
+    const result = { ...row, verifyStatus: 'ok', issues: [] };
+
+    // Find first unused import row that matches (itemNo exact + nameCN fuzzy)
+    const impIdx = importRows.findIndex((ir, i) =>
+      !usedImportIdxs.has(i) && matchesPORow(row, ir.itemNo, ir.nameCN)
+    );
+
+    if (impIdx === -1) {
+      result.verifyStatus = 'missing';
+      result.issues.push('核对文件中未找到此物料（货号相同且名称匹配）');
+      missing++;
+      errorList.push({ idx, type: 'missing', msg: `第${idx+1}行 ${row.nameCN}：核对文件无此物料` });
+      return result;
+    }
+
+    usedImportIdxs.add(impIdx);
+    const imp = importRows[impIdx];
+
+    // Compare fields — 数值类用 numEq（容差 0.01），文本类用 txtEq
+    const has = v => v !== null && v !== undefined && String(v).trim() !== '';
+
+    // 数量
+    if (has(imp.qty) && !numEq(row.qty, imp.qty)) {
+      const diff = parseFloat(imp.qty||0) - parseFloat(row.qty||0);
+      result.issues.push(`数量不匹配：核对文件=${imp.qty}，当前=${row.qty||'空'}，差异=${diff}`);
+    }
+    // 采购单价
+    if (has(imp.price) && !numEq(row.purchasePrice, imp.price)) {
+      result.issues.push(`采购单价不匹配：核对文件=${imp.price}，当前=${row.purchasePrice||'空'}`);
+    }
+    // 供应商
+    if (has(imp.supplier) && !txtEq(row.supplier, imp.supplier)) {
+      result.issues.push(`供应商不匹配：核对文件=${imp.supplier}，当前=${row.supplier||'空'}`);
+    }
+    // 采购单号
+    if (has(imp.poNo) && !txtEq(row.poNo, imp.poNo)) {
+      result.issues.push(`采购单号不匹配：核对文件=${imp.poNo}，当前=${row.poNo||'空'}`);
+    }
+    // 采购单日期
+    if (has(imp.poDate) && !txtEq(row.poDate, imp.poDate)) {
+      result.issues.push(`采购单日期不匹配：核对文件=${imp.poDate}，当前=${row.poDate||'空'}`);
+    }
+    // 提单抬头
+    if (has(imp.blHead) && !txtEq(row.blHead, imp.blHead)) {
+      result.issues.push(`提单抬头不匹配：核对文件=${imp.blHead}，当前=${row.blHead||'空'}`);
+    }
+    // 规格
+    if (has(imp.spec) && !txtEq(row.spec, imp.spec)) {
+      result.issues.push(`规格不匹配：核对文件=${imp.spec}，当前=${row.spec||'空'}`);
+    }
+    // 币种
+    if (has(imp.currency) && !txtEq(row.currency, imp.currency)) {
+      result.issues.push(`币种不匹配：核对文件=${imp.currency}，当前=${row.currency||'空'}`);
+    }
+    // 箱数
+    if (has(imp.cartons) && !numEq(row.cartons, imp.cartons, 0)) {
+      result.issues.push(`箱数不匹配：核对文件=${imp.cartons}，当前=${row.cartons||'空'}`);
+    }
+    // 长/宽/高
+    if (has(imp.length) && !numEq(row.length, imp.length, 0.1)) {
+      result.issues.push(`长(cm)不匹配：核对文件=${imp.length}，当前=${row.length||'空'}`);
+    }
+    if (has(imp.width) && !numEq(row.width, imp.width, 0.1)) {
+      result.issues.push(`宽(cm)不匹配：核对文件=${imp.width}，当前=${row.width||'空'}`);
+    }
+    if (has(imp.height) && !numEq(row.height, imp.height, 0.1)) {
+      result.issues.push(`高(cm)不匹配：核对文件=${imp.height}，当前=${row.height||'空'}`);
+    }
+    // 毛重总重
+    if (has(imp.grossWeight) && !numEq(row.grossWeight, imp.grossWeight, 0.5)) {
+      result.issues.push(`毛重总重不匹配：核对文件=${imp.grossWeight}，当前=${row.grossWeight||'空'}`);
+    }
+    // 净重总重
+    if (has(imp.netWeight) && !numEq(row.netWeightTotal, imp.netWeight, 0.5)) {
+      result.issues.push(`净重总重不匹配：核对文件=${imp.netWeight}，当前=${row.netWeightTotal||'空'}`);
+    }
+    // 纸箱重量
+    if (has(imp.cartonWeight) && !numEq(row.cartonWeight, imp.cartonWeight, 0.05)) {
+      result.issues.push(`纸箱重量不匹配：核对文件=${imp.cartonWeight}，当前=${row.cartonWeight||'空'}`);
+    }
+
+    if (result.issues.length) {
+      result.verifyStatus = 'mismatch';
+      mismatched++;
+      errorList.push({ idx, type: 'mismatch', msg: `第${idx+1}行 ${row.nameCN}：${result.issues[0]}` });
+    } else {
+      matched++;
+    }
+    return result;
+  });
+
+  // Extra rows in import file not matched to any state row
+  importRows.forEach((ir, i) => {
+    if (!usedImportIdxs.has(i) && ir.itemNo) {
+      missing++;
+      errorList.push({ idx: -1, type: 'extra', msg: `核对文件有物料 货号=${ir.itemNo} 名称=${ir.nameCN}，当前填单无此物料` });
+    }
+  });
+
+  // Update summary
+  document.getElementById('sum-match').textContent = matched;
+  document.getElementById('sum-mismatch').textContent = mismatched;
+  document.getElementById('sum-missing').textContent = missing;
+  document.getElementById('verify-summary').classList.remove('hidden');
+  document.getElementById('verify-table-wrap').classList.remove('hidden');
+
+  // Error list
+  const erEl = document.getElementById('error-list');
+  if (errorList.length === 0) {
+    erEl.innerHTML = '<div class="text-green-600 font-semibold text-center py-2">✓ 所有数据核对通过！</div>';
+  } else {
+    erEl.innerHTML = '<div class="font-semibold mb-2 text-gray-700">错误详情（点击跳转到对应行）：</div>' +
+      errorList.map(e => `
+        <div class="error-item ${e.type==='mismatch'?'text-red-700':'text-yellow-700'}" onclick="scrollToVerifyRow(${e.idx})">
+          ${e.type==='mismatch'?'🔴':'🟡'} ${e.msg}
+        </div>
+      `).join('');
+  }
+
+  renderVerifyTable();
+}
+
+function renderVerifyTable() {
+  const tbody = document.getElementById('verify-tbody');
+  const data = state.verifyResult.length ? state.verifyResult : state.rows;
+  tbody.innerHTML = data.map((row, idx) => {
+    const hasResult = state.verifyResult.length > 0;
+    const status = hasResult ? (row.verifyStatus || 'ok') : 'ok';
+    const issues = hasResult ? (row.issues || []) : [];
+    const bgClass = status === 'mismatch' ? 'verify-mismatch' : (status === 'missing' ? 'verify-missing' : '');
+    const tooltip = issues.length ? `<div class="tooltip-box">${issues.join('\n')}</div>` : '';
+    const badge = status === 'mismatch' ? '<span style="background:#ef4444;color:white;border-radius:4px;padding:1px 6px;font-size:11px">不匹配</span>' :
+                  status === 'missing' ? '<span style="background:#f59e0b;color:white;border-radius:4px;padding:1px 6px;font-size:11px">缺失</span>' :
+                  '<span style="background:#16a34a;color:white;border-radius:4px;padding:1px 6px;font-size:11px">✓</span>';
+    return `
+      <tr id="verify-row-${idx}" class="${bgClass}">
+        <td style="text-align:center">${idx+1}</td>
+        <td>${row.itemNo||''}</td>
+        <td>${row.materialCode||''}</td>
+        <td>${row.nameCN||''}</td>
+        <td>${row.qty||''}</td>
+        <td>${row.purchasePrice||''}</td>
+        <td>${row.supplier||''}</td>
+        <td>${row.spec||''}</td>
+        <td>${row.currency||''}</td>
+        <td><div class="tooltip-wrap">${badge}${tooltip}</div></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function scrollToVerifyRow(idx) {
+  if (idx < 0) return;
+  const el = document.getElementById('verify-row-' + idx);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function clearVerification() {
+  state.verifyResult = [];
+  verifyImportedData = [];
+  verifyImportedFiles = [];
+  document.getElementById('verify-files-list').innerHTML = '';
+  document.getElementById('verify-summary').classList.add('hidden');
+  document.getElementById('verify-table-wrap').classList.add('hidden');
+  renderVerifyTable();
+}
+
+// ============================================================
+//  STEP 5: EXCEL EXPORT  (ExcelJS — styled, template-matched)
+// ============================================================
+
+// 49-column headers matching template row 2 (A–AW)
+const TEMPLATE_HEADERS = [
+  '序号\nserial number',                                                          // A  1
+  '中国HSCODE\n（China）',                                                         // B  2
+  '印尼HS CODE \n(Indonesia)',                                                     // C  3
+  '货号\nItem No.（导入时以此列货号为准）',                                           // D  4
+  '产品中文名称\nChinese name of the product',                                      // E  5
+  '产品英文名称\nEnglish name of the product',                                      // F  6
+  '规格\nspecification',                                                           // G  7
+  '类别\nkategori',                                                                // H  8
+  '单位\nUnit',                                                                    // I  9
+  '送货KG重量\nQuantity',                                                          // J  10
+  '送货数量\nProduct quantity',                                                     // K  11
+  '单位\nUnit',                                                                    // L  12
+  '采购单价（含港币）\nPurchase price',                                              // M  13  (unused, keep blank)
+  '采购金额\nPurchase Amount',                                                      // N  14  (unused)
+  '毛重总重\nTotal Gross weight（KGM）',                                            // O  15
+  '净重总重\nTotal Net weight（KGM）',                                              // P  16
+  '立方数/每箱\nCBM/Per carton',                                                    // Q  17
+  '总立方数\nTotal CBM',                                                           // R  18
+  '图片\nPicture',                                                                 // S  19
+  '产品用途;\nproduct use',                                                         // T  20
+  '合同号码\nContract No.',                                                         // U  21
+  '合同日期\nDate of contract',                                                     // V  22
+  '发票号\nInvoice No.',                                                            // W  23
+  '发票日期\nDate of Invoice',                                                      // X  24
+  '发票单价\nUnit price on invoice',                                                // Y  25
+  '金额\nInvoice amount',                                                           // Z  26
+  '发票合计金额\nInvoice total amount',                                              // AA 27
+  '柜号\nContainer No.',                                                            // AB 28
+  '走柜日期\nShipping date',                                                        // AC 29
+  '提单号\nBl No.',                                                                 // AD 30
+  '预计到港日期\nETA PORT',                                                          // AE 31
+  '实际到厂日期 Actual arrival date',                                               // AF 32
+  'Vessel Name/Voyage No.',                                                        // AG 33
+  "总集装箱运费金额（中国运费） Total Container Freight Amount (China's Freight)",    // AH 34
+  '货运代理运输费用 Forwarder Transportation Costs (Indonesia Freight)',             // AI 35
+  'Actual freight for product',                                                    // AJ 36
+  '供应商\nSupplier',                                                               // AK 37
+  '采购单日期\nDate of purchase order',                                             // AL 38
+  '采购单号\nPO No.',                                                               // AM 39
+  '采购单价\nPurchase price',                                                       // AN 40
+  '采购金额\nPurchase Amount',                                                      // AO 41
+  '采购总额 Total Amount',                                                          // AP 42
+  '报关出口公司',                                                                   // AQ 43
+  '提单抬头',                                                                      // AR 44
+  '箱数\nCarton No.',                                                               // AS 45
+  '长\nLength',                                                                    // AT 46
+  '宽\nWidth',                                                                     // AU 47
+  '高\nHeight',                                                                    // AV 48
+  '物料编码',                                                                      // AW 49
+];
+
+// Template column widths (index 0 = col A)
+const TEMPLATE_COL_WIDTHS = [
+  9.99,   // A  序号
+  17.03,  // B  中国HSCODE
+  15.68,  // C  印尼HSCODE
+  17.53,  // D  货号
+  18.64,  // E  产品中文名称
+  24.72,  // F  产品英文名称
+  22.28,  // G  规格
+  12.03,  // H  类别
+  9.13,   // I  单位
+  19.31,  // J  送货KG重量
+  17.76,  // K  送货数量
+  7.82,   // L  单位
+  20.87,  // M  采购单价含港币
+  8,      // N  采购金额(模板默认宽)
+  24.99,  // O  毛重总重
+  20.87,  // P  净重总重
+  8,      // Q  立方数/每箱
+  8,      // R  总立方数
+  32.51,  // S  图片
+  20.87,  // T  产品用途
+  20.87,  // U  合同号码
+  8,      // V  合同日期
+  8,      // W  发票号
+  8,      // X  发票日期
+  20.87,  // Y  发票单价
+  8,      // Z  发票金额
+  8,      // AA 发票合计
+  20.87,  // AB 柜号
+  8,      // AC 走柜日期
+  8,      // AD 提单号
+  8,      // AE ETA
+  8,      // AF 实际到厂
+  22.86,  // AG Vessel
+  23.97,  // AH 集装箱运费
+  19.78,  // AI 货代运费
+  34.62,  // AJ 实际运费
+  26.88,  // AK 供应商
+  16.98,  // AL 采购单日期
+  17.72,  // AM 采购单号
+  19.17,  // AN 采购单价
+  16.47,  // AO 采购金额
+  16.22,  // AP 采购总额
+  26.67,  // AQ 报关出口公司
+  27.28,  // AR 提单抬头
+  9.22,   // AS 箱数
+  24.53,  // AT 长
+  8,      // AU 宽
+  8,      // AV 高
+  8,      // AW 物料编码
+];
+
+async function exportExcel() {
+  if (!state.rows.length) return alert('没有数据可导出');
+
+  const loadingDateRaw = document.getElementById('exp-loading-date').value;
+  const factoryCode = document.getElementById('exp-factory-code').value.trim();
+
+  if (!loadingDateRaw) return alert('请填写装柜日期');
+  if (!factoryCode) return alert('请填写送达厂区英文缩写');
+
+  const yyyymmdd = loadingDateRaw.replace(/-/g, '');
+  const filename = `${yyyymmdd}${factoryCode}河源1柜.xlsx`;
+
+  // Sheet name = factoryCode + loading date
+  const sheetName = `${factoryCode}${yyyymmdd}`;
+
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet(sheetName);
+
+  // ---- Column widths ----
+  TEMPLATE_COL_WIDTHS.forEach((w, i) => {
+    ws.getColumn(i + 1).width = w;
+  });
+
+  // ---- Row 1: empty (reserve for summary row like template) ----
+  ws.getRow(1).height = 50;
+
+  // ---- Row 2: Header ----
+  const headerRow = ws.getRow(2);
+  headerRow.height = 103.75;
+  TEMPLATE_HEADERS.forEach((hdr, i) => {
+    const cell = headerRow.getCell(i + 1);
+    cell.value = hdr;
+    cell.font   = { name: '等线', size: 12, bold: true };
+    cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = {
+      top:    { style: 'thin' }, bottom: { style: 'thin' },
+      left:   { style: 'thin' }, right:  { style: 'thin' }
+    };
+  });
+
+  // ---- Freeze panes: top-left of unfrozen area = V4 (col 22, row 4) ----
+  ws.views = [{ state: 'frozen', xSplit: 21, ySplit: 3, topLeftCell: 'V4', activeCell: 'A4' }];
+
+  // ---- Build group info ----
+  const groupOrder = []; // unique groupIds in order of first appearance
+  const groupStartDataIdx = {}; // groupId -> 0-based index in state.rows
+  const groupSize = {};
+  state.rows.forEach((row, idx) => {
+    if (row.groupId !== null) {
+      if (!(row.groupId in groupSize)) {
+        groupOrder.push(row.groupId);
+        groupStartDataIdx[row.groupId] = idx;
+        groupSize[row.groupId] = 0;
+      }
+      groupSize[row.groupId]++;
+    }
+  });
+
+  // ---- Data rows start at Excel row 3 ----
+  const DATA_START_ROW = 3;
+
+  state.rows.forEach((row, idx) => {
+    const excelRowNum = DATA_START_ROW + idx;
+    const excelRow = ws.getRow(excelRowNum);
+    excelRow.height = 108.75;
+
+    const groupRows = row.groupId !== null ? state.rows.filter(r => r.groupId === row.groupId) : [];
+    const isMaster = row.groupId === null || groupRows[0].id === row.id;
+
+    // Helper: get value only for master row in a group (box-shared columns)
+    const bv = (field) => isMaster ? (row[field] || '') : '';
+    const bvNum = (field) => isMaster ? (parseFloat(row[field]) || '') : '';
+
+    // Build the 49-column data array (columns A–AW)
+    // Formulas use ExcelJS formula syntax (prefix with '=')
+    const r = excelRowNum;
+    const cellData = [
+      idx + 1,                               // A  序号
+      row.hscodeChina || '',                 // B  中国HSCODE
+      row.hscodeIndonesia || '',             // C  印尼HSCODE
+      row.itemNo || '',                      // D  货号
+      row.nameCN || '',                      // E  产品中文名称
+      row.nameEN || '',                      // F  产品英文名称
+      row.spec || '',                        // G  规格
+      row.category || '',                    // H  类别
+      row.unit || '',                        // I  单位
+      // J: 送货KG重量 = qty * unitWeight(g) / 1000
+      (row.qty && row.unitWeight)
+        ? { formula: `${parseFloat(row.unitWeight)}*K${r}/1000` }
+        : (row.kgWeight ? parseFloat(row.kgWeight) : ''),          // J
+      parseFloat(row.qty) || '',             // K  送货数量
+      row.unit || '',                        // L  单位
+      '',                                    // M  采购单价含港币(留空)
+      '',                                    // N  采购金额(留空)
+      // O: 毛重总重 = 净重 + 箱数 × 纸箱重量
+      (row.grossWeight) ? parseFloat(row.grossWeight) : '',         // O
+      // P: 净重总重
+      (row.netWeightTotal) ? parseFloat(row.netWeightTotal) : '',   // P
+      // Q: 立方数/每箱 — formula only for master
+      isMaster && row.length && row.width && row.height
+        ? { formula: `AT${r}*AU${r}*AV${r}/28316.75*0.0283` }
+        : (isMaster && row.cbmPerCarton ? parseFloat(row.cbmPerCarton) : ''),  // Q
+      // R: 总立方数
+      isMaster && row.cbmPerCarton && row.cartons
+        ? { formula: `ROUND(Q${r}*AS${r},2)` }
+        : (isMaster && row.totalCbm ? parseFloat(row.totalCbm) : ''),          // R
+      '',                                    // S  图片 (DISPIMG placeholder — see below)
+      row.usage || '',                       // T  产品用途
+      row.contractNo || '',                  // U  合同号码
+      row.contractDate || '',                // V  合同日期
+      row.invoiceNo || '',                   // W  发票号
+      row.invoiceDate || '',                 // X  发票日期
+      // Y: 发票单价
+      row.invoicePrice ? parseFloat(row.invoicePrice) : '',         // Y
+      // Z: 发票金额 = Y * J
+      (row.invoicePrice && row.kgWeight)
+        ? { formula: `Y${r}*J${r}` }
+        : (row.invoiceAmount ? parseFloat(row.invoiceAmount) : ''), // Z
+      // AA: 发票合计 = SUM(Z)
+      row.invoiceAmount
+        ? { formula: `SUM(Z${r})` }
+        : '',                                                        // AA
+      '',                                    // AB 柜号
+      '',                                    // AC 走柜日期
+      '',                                    // AD 提单号
+      '',                                    // AE ETA
+      '',                                    // AF 实际到厂
+      '',                                    // AG Vessel
+      '',                                    // AH 集装箱运费
+      '',                                    // AI 货代运费
+      '',                                    // AJ 实际运费
+      row.supplier || '',                    // AK 供应商
+      row.poDate || '',                      // AL 采购单日期
+      row.poNo || '',                        // AM 采购单号
+      row.purchasePrice ? parseFloat(row.purchasePrice) : '',       // AN 采购单价
+      // AO: 采购金额 = ROUND(AN * J, 2)
+      (row.purchasePrice && row.kgWeight)
+        ? { formula: `ROUND(AN${r}*J${r},2)` }
+        : (row.purchaseAmount ? parseFloat(row.purchaseAmount) : ''),  // AO
+      '',                                    // AP 采购总额 (SUM formula added below per group)
+      row.exportCo || '',                    // AQ 报关出口公司
+      row.blHead || '',                      // AR 提单抬头
+      isMaster ? (parseFloat(row.cartons) || '') : '',  // AS 箱数
+      isMaster ? (parseFloat(row.length) || '') : '',   // AT 长
+      isMaster ? (parseFloat(row.width) || '') : '',    // AU 宽
+      isMaster ? (parseFloat(row.height) || '') : '',   // AV 高
+      row.materialCode || '',                // AW 物料编码
+    ];
+
+    // Write each cell
+    cellData.forEach((val, colIdx) => {
+      const cell = excelRow.getCell(colIdx + 1);
+      if (val && typeof val === 'object' && val.formula) {
+        cell.value = { formula: val.formula };
+      } else {
+        cell.value = (val === '' || val === null || val === undefined) ? null : val;
+      }
+      cell.font = { name: '宋体', size: 12, bold: false };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.border = {
+        top:    { style: 'thin' }, bottom: { style: 'thin' },
+        left:   { style: 'thin' }, right:  { style: 'thin' }
+      };
+    });
+
+    // S column (col 19): if image exists, insert DISPIMG formula
+    const sCell = excelRow.getCell(19); // S
+    if (row.image && row.image.startsWith('data:image')) {
+      // Extract base64 data and add image to workbook
+      const base64Data = row.image.split(',')[1];
+      const ext = row.image.match(/data:image\/(\w+)/)?.[1] || 'png';
+      const imgId = wb.addImage({ base64: base64Data, extension: ext });
+      ws.addImage(imgId, {
+        tl: { col: 18, row: excelRowNum - 1 },  // 0-indexed
+        br: { col: 19, row: excelRowNum },
+      });
+      sCell.value = null;
+    } else {
+      sCell.value = null;
+    }
+  });
+
+  // ---- Build supplier-group info (supplier + exportCo + blHead) ----
+  // This drives: AK/AQ/AR merge, AP SUM (purchase total), AA SUM (invoice total)
+  const supplierGroupMap = {}; // key -> [stateIdx, ...]
+  state.rows.forEach((row, idx) => {
+    const key = `${row.supplier||''}|||${row.exportCo||''}|||${row.blHead||''}`;
+    if (!supplierGroupMap[key]) supplierGroupMap[key] = [];
+    supplierGroupMap[key].push(idx);
+  });
+
+  // ---- AP (col 42) formula: SUM per supplier group if ≥2 rows, else mirror AO ----
+  // ---- AA (col 27) formula: SUM per supplier group if ≥2 rows, else SUM(Z) ----
+  Object.values(supplierGroupMap).forEach(idxArr => {
+    const isSGroup = idxArr.length >= 2;
+    idxArr.forEach((stateIdx, pos) => {
+      const excelRowNum = DATA_START_ROW + stateIdx;
+      const isMasterOfGroup = pos === 0;
+
+      // AP cell
+      const apCell = ws.getRow(excelRowNum).getCell(42);
+      if (!isSGroup) {
+        apCell.value = { formula: `AO${excelRowNum}` };
+      } else if (isMasterOfGroup) {
+        const groupStart = DATA_START_ROW + idxArr[0];
+        const groupEnd = DATA_START_ROW + idxArr[idxArr.length - 1];
+        apCell.value = { formula: `SUM(AO${groupStart}:AO${groupEnd})` };
+      } else {
+        apCell.value = null;
+      }
+      apCell.font = { name: '宋体', size: 12 };
+      apCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      apCell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+
+      // AA cell (invoice total = SUM of Z values in group)
+      const aaCell = ws.getRow(excelRowNum).getCell(27);
+      if (!isSGroup) {
+        aaCell.value = { formula: `SUM(Z${excelRowNum})` };
+      } else if (isMasterOfGroup) {
+        const groupStart = DATA_START_ROW + idxArr[0];
+        const groupEnd = DATA_START_ROW + idxArr[idxArr.length - 1];
+        aaCell.value = { formula: `SUM(Z${groupStart}:Z${groupEnd})` };
+      } else {
+        aaCell.value = null;
+      }
+      aaCell.font = { name: '宋体', size: 12 };
+      aaCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      aaCell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+    });
+  });
+
+  // ---- Merges ----
+  // 1. Box group merges (user-created拼箱): Q, R, AS, AT, AU, AV (shared box dimensions)
+  Object.keys(groupSize).forEach(gid => {
+    const size = groupSize[gid];
+    if (size < 2) return;
+    const startIdx = state.rows.findIndex(r => r.groupId == gid);
+    const startExcelRow = DATA_START_ROW + startIdx;
+    const endExcelRow = startExcelRow + size - 1;
+    // Box dimension cols: Q=17, R=18, AS=45, AT=46, AU=47, AV=48
+    [17, 18, 45, 46, 47, 48].forEach(colNum => {
+      ws.mergeCells(startExcelRow, colNum, endExcelRow, colNum);
+      ws.getCell(startExcelRow, colNum).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    });
+  });
+
+  // 2. Supplier-group merges: AK=37, AL=38, AM=39, AP=42, AQ=43, AR=44, AA=27
+  Object.values(supplierGroupMap).forEach(idxArr => {
+    if (idxArr.length < 2) return;
+    // Check that the rows are contiguous (they may not be if user reordered)
+    // Only merge if contiguous
+    let contiguous = true;
+    for (let i = 1; i < idxArr.length; i++) {
+      if (idxArr[i] !== idxArr[i-1] + 1) { contiguous = false; break; }
+    }
+    if (!contiguous) return;
+
+    const startExcelRow = DATA_START_ROW + idxArr[0];
+    const endExcelRow = DATA_START_ROW + idxArr[idxArr.length - 1];
+    // AK=37(supplier), AL=38(poDate), AM=39(poNo), AP=42(purchaseTotal), AQ=43(exportCo), AR=44(blHead), AA=27(invoiceTotal)
+    [27, 37, 38, 39, 42, 43, 44].forEach(colNum => {
+      ws.mergeCells(startExcelRow, colNum, endExcelRow, colNum);
+      ws.getCell(startExcelRow, colNum).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    });
+  });
+
+  // ---- Generate and download ----
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================
+//  UTILITIES
+// ============================================================
+function showModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+function updateHeader() {
+  document.getElementById('header-customer').textContent = state.selectedCustomer || '未选择';
+  document.getElementById('header-items').textContent = state.selectedItems.length ? state.selectedItems.join('、') : '未选择';
+}
+
+// Close modal on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.add('hidden'); });
+});
+
+// Live filename preview on Step 5
+function updateFilenamePreview() {
+  const d = document.getElementById('exp-loading-date');
+  const f = document.getElementById('exp-factory-code');
+  const preview = document.getElementById('exp-filename-preview');
+  if (!d || !f || !preview) return;
+  const yyyymmdd = (d.value || 'YYYYMMDD').replace(/-/g, '');
+  const code = f.value.trim() || 'XXX';
+  preview.textContent = `${yyyymmdd}${code}河源1柜.xlsx`;
+}
+document.addEventListener('input', e => {
+  if (e.target.id === 'exp-loading-date' || e.target.id === 'exp-factory-code') {
+    updateFilenamePreview();
+  }
+});
+
+// ============================================================
+//  BULK IMPORT MATERIALS
+// ============================================================
+
+// Column name mapping for import template
+// Keys = exact column headers from 4月22日RRM河源1柜.xlsx Row 2 (plus extra material fields)
+const IMPORT_COL_MAP = {
+  '货号 / Item No.（括号内的为新货号）':          'itemNo',
+  '中国HSCODE（China）':                          'hscodeChina',
+  '印尼HS CODE (Indonesia)':                      'hscodeIndonesia',
+  '产品中文名称 / Chinese name of the product':   'nameCN',
+  '产品英文名称 / English name of the product':   'nameEN',
+  '规格 / specification':                         'spec',
+  '类别 / kategori':                              'category',
+  '单位 / Unit':                                  'unit',
+  '送货数量 / Product quantity':                  'qty',
+  '图片 / Picture':                               'image',
+  '产品用途 / product use':                       'usage',
+  '合同号码 / Contract No.':                      'contractNo',
+  '合同日期 / Date of contract':                  'contractDate',
+  '发票号 / Invoice No.':                         'invoiceNo',
+  '发票日期 / Date of Invoice':                   'invoiceDate',
+  '发票单价 / Unit price on invoice':             'invoicePrice',
+  '供应商 / Supplier':                            'supplier',
+  '采购单日期 / Date of purchase order':          'poDate',
+  '采购单号 / PO No.':                            'poNo',
+  '采购单价 / Purchase price':                    'purchasePrice',
+  '报关出口公司':                                  'exportCo',
+  '提单抬头':                                      'blHead',
+  '箱数 / Carton No.':                            'cartons',
+  '长 / Length':                                  'length',
+  '宽 / Width':                                   'width',
+  '高 / Height':                                  'height',
+  '物料编码':                                      'materialCode',
+  // 额外物料字段（不在4月22日RRM河源1柜.xlsx中，补充材料信息）
+  '物料单重(g)':                                   'unitWeight',
+  '单个净重':                                      'netWeight',
+  '纸箱重量(kg)':                                  'cartonWeight',
+  '币种':                                          'currency',
+};
+
+// Pending bulk import state (used across the confirm dialog)
+let _bulkPending = { parsed: [], duplicates: [], existing: [] };
+
+function bulkImportMaterials(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    let wb;
+    try {
+      wb = XLSX.read(e.target.result, { type: 'array', cellStyles: true, cellDates: true });
+    } catch(err) {
+      return alert('文件读取失败，请确认是有效的 Excel 文件。');
+    }
+
+    const ws = wb.Sheets[wb.SheetNames[0]];
+
+    // Try Row 1 as headers first; if few columns match, fall back to Row 2
+    // (4月22日RRM河源1柜.xlsx uses Row 1 as summary and Row 2 as the real header row)
+    let jsonRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+    if (jsonRows.length) {
+      const firstKeys = Object.keys(jsonRows[0]);
+      const knownCols = Object.keys(IMPORT_COL_MAP);
+      const matchCount = knownCols.filter(c => firstKeys.includes(c)).length;
+      if (matchCount < 2) {
+        // Row 1 doesn't match — try Row 2 as header row
+        const rawRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (rawRows.length >= 2) {
+          const headerRow = rawRows[1].map(h => String(h || '').trim());
+          const dataRows  = rawRows.slice(2);
+          jsonRows = dataRows.map(row => {
+            const obj = {};
+            headerRow.forEach((h, i) => { if (h) obj[h] = row[i] !== undefined ? row[i] : ''; });
+            return obj;
+          });
+        }
+      }
+    }
+
+    if (!jsonRows.length) return alert('表格内容为空，请检查文件。');
+
+    // Build a flexible column lookup (exact match first, then broad alias fallback)
+    const firstRowKeys = Object.keys(jsonRows[0] || {});
+    // Map IMPORT_COL_MAP keys to whichever actual column header is present
+    const colLookup = {};
+    Object.entries(IMPORT_COL_MAP).forEach(([templateCol, field]) => {
+      if (firstRowKeys.includes(templateCol)) {
+        colLookup[field] = templateCol;
+      }
+    });
+    // Also accept legacy short names (e.g. template generated before this update)
+    const legacyMap = {
+      '货号': 'itemNo', '产品中文名称': 'nameCN', '产品英文名称': 'nameEN',
+      '规格': 'spec', '类别': 'category', '单位': 'unit', '产品用途': 'usage',
+      '发票单价': 'invoicePrice', '供应商': 'supplier', '采购单价': 'purchasePrice',
+      '报关出口公司': 'exportCo', '提单抬头': 'blHead', '物料编码': 'materialCode',
+      '物料单重': 'unitWeight', '单个净重': 'netWeight', '币种': 'currency', '图片': 'image',
+    };
+    Object.entries(legacyMap).forEach(([col, field]) => {
+      if (firstRowKeys.includes(col) && !colLookup[field]) colLookup[field] = col;
+    });
+
+    // Require at least itemNo or materialCode to proceed
+    if (!colLookup.itemNo && !colLookup.materialCode) {
+      return alert('列名不匹配：未找到"货号"或"物料编码"列。\n请下载导入模板，按照模板格式填写后重新导入。');
+    }
+
+    // Parse rows into material objects
+    const parsed = jsonRows.map(row => {
+      const mat = {};
+      Object.entries(colLookup).forEach(([field, col]) => {
+        mat[field] = row[col] !== undefined ? String(row[col]).trim() : '';
+      });
+      if (mat.image && mat.image.match(/^https?:\/\//i)) {
+        mat._imageUrl = mat.image;
+        mat.image = '';
+      }
+      return mat;
+    }).filter(m => m.itemNo || m.materialCode); // keep rows with either key
+
+    if (!parsed.length) return alert('未找到有效物料行（货号或物料编码不能为空）。');
+
+    // Duplicate check against existing data
+    const existing = LS.get('materials') || [];
+    const existingKeys = new Set(existing.map(m => m.itemNo + '|' + m.materialCode));
+    const duplicates = parsed.filter(m => existingKeys.has(m.itemNo + '|' + m.materialCode));
+
+    _bulkPending = { parsed, duplicates, existing };
+
+    if (duplicates.length > 0) {
+      document.getElementById('bulk-confirm-msg').textContent =
+        `发现 ${duplicates.length} 个重复物料（货号+物料编码已存在），请选择处理方式：`;
+      document.getElementById('bulk-dup-list').innerHTML = duplicates.map(m =>
+        `<div class="py-0.5">货号 <strong>${m.itemNo}</strong> · 物料编码 <strong>${m.materialCode}</strong> · ${m.nameCN}</div>`
+      ).join('');
+      showModal('modal-bulk-confirm');
+    } else {
+      finalizeBulkImport(false);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function finalizeBulkImport(overwrite) {
+  closeModal('modal-bulk-confirm');
+  const { parsed, duplicates, existing } = _bulkPending;
+  const dupKeys = new Set(duplicates.map(m => m.itemNo + '|' + m.materialCode));
+
+  // Resolve URL images to base64 first
+  const imageLoadPromises = parsed.map(mat => {
+    if (!mat._imageUrl) return Promise.resolve();
+    return fetch(mat._imageUrl)
+      .then(r => r.blob())
+      .then(blob => new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = ev => { mat.image = ev.target.result; resolve(); };
+        reader.onerror = () => resolve(); // fail silently
+        reader.readAsDataURL(blob);
+      }))
+      .catch(() => {}) // network failure: keep image empty
+      .finally(() => { delete mat._imageUrl; });
+  });
+
+  await Promise.all(imageLoadPromises);
+
+  let importCount = 0;
+  let skipCount = 0;
+  let updatedExisting = [...existing];
+
+  parsed.forEach(mat => {
+    const key = mat.itemNo + '|' + mat.materialCode;
+    if (dupKeys.has(key)) {
+      if (overwrite) {
+        // Replace existing entry
+        const idx = updatedExisting.findIndex(m => m.itemNo + '|' + m.materialCode === key);
+        if (idx !== -1) updatedExisting[idx] = mat;
+        importCount++;
+      } else {
+        skipCount++;
+      }
+    } else {
+      updatedExisting.push(mat);
+      importCount++;
+    }
+  });
+
+  LS.set('materials', updatedExisting);
+  renderItems(); // refresh step 2 item list
+  alert(`导入完成！\n✅ 成功导入 ${importCount} 个物料${overwrite && skipCount === 0 ? '（含覆盖）' : ''}\n${skipCount > 0 ? `⏭ 跳过 ${skipCount} 个重复物料` : ''}`);
+}
+
+function downloadImportTemplate() {
+  const headers = Object.keys(IMPORT_COL_MAP);
+  const wb = XLSX.utils.book_new();
+  // Example row aligned to IMPORT_COL_MAP column order:
+  // 货号, 中国HSCODE, 印尼HSCODE, 中文名, 英文名, 规格, 类别, 单位, 送货数量,
+  // 图片, 产品用途, 合同号码, 合同日期, 发票号, 发票日期, 发票单价,
+  // 供应商, 采购单日期, 采购单号, 采购单价, 报关出口公司, 提单抬头,
+  // 箱数, 长, 宽, 高, 物料编码, 物料单重(g), 单个净重, 纸箱重量(kg), 币种
+  const exampleRow = [
+    '40029（40027）', '39269090', '39269090', '塑胶件-子弹筒', 'Plastic parts - cartridges',
+    'φ5*10mm', '塑胶', 'pcs', '61800',
+    '', '玩具配件', 'HT-2024-001', '2024-01-01', 'INV-001', '2024-01-10', '4.66',
+    '华兴玩具制品（河源）有限公司', '2024-01-05', 'PO-2024-001', '4.50', '广州出口有限公司', 'BUZZBEE INDONESIA',
+    '103', '61.9', '32.1', '28.6', '53003116', '16', '0.016', '0.88', 'HKD',
+  ];
+  const ws = XLSX.utils.aoa_to_sheet([headers, exampleRow]);
+  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 1.6, 16) }));
+  XLSX.utils.book_append_sheet(wb, ws, '物料导入模板');
+  XLSX.writeFile(wb, '物料批量导入模板（4月22日RRM格式）.xlsx');
+}
+
+// ============================================================
+//  采购单导入模板（第三步：导入采购单 自动填充用）
+//  字段顺序与命名严格对应 importPurchaseOrder 中的 COL_ALIASES 识别规则
+// ============================================================
+function downloadPOTemplate() {
+  // 列定义：[列名, 列宽, 是否必填]
+  const cols = [
+    ['序号',          6,  false],
+    ['供应商',        24, false],   // 支持合并单元格（前向填充）
+    ['采购单日期',    14, false],   // 支持合并单元格（前向填充）
+    ['采购单号',      18, false],   // 支持合并单元格（前向填充）
+    ['提单抬头',      20, false],   // 支持合并单元格（前向填充）
+    ['货号',          14, true],    // 必填，匹配键
+    ['产品中文名称',  22, false],   // 用于模糊匹配辅助
+    ['规格',          16, false],
+    ['送货数量',      10, false],
+    ['采购单价',      10, false],
+    ['币种',          8,  false],
+    ['箱数',          8,  false],
+    ['长(cm)',        9,  false],
+    ['宽(cm)',        9,  false],
+    ['高(cm)',        9,  false],
+    ['毛重总重',      10, false],
+    ['净重总重',      10, false],
+    ['纸箱重量(kg)',  12, false],
+  ];
+  const headers = cols.map(c => c[0]);
+
+  // 示例数据：演示"一个供应商/采购单 对应多个物料"的合并单元格场景
+  // 后续行的供应商/采购单日期/采购单号/提单抬头留空，由合并单元格逻辑前向填充
+  const rows = [
+    [1, '华兴玩具制品（河源）有限公司', '2024-01-05', 'PO-2024-001', 'BUZZBEE INDONESIA',
+     '40029（40027）', '塑胶件-子弹筒', 'φ5*10mm', 61800, 4.50, 'HKD',
+     103, 61.9, 32.1, 28.6, 1850.5, 988.8, 0.88],
+    [2, '', '', '', '',
+     '40028', '塑胶件-发射器', 'φ8*15mm', 30000, 6.20, 'HKD',
+     50, 55.0, 30.0, 25.0, 920.0, 480.0, 0.85],
+    [3, '深圳市XX电子有限公司', '2024-01-08', 'PO-2024-002', 'BUZZBEE INDONESIA',
+     '50101', '电池盒', '5号x4', 12000, 8.30, 'HKD',
+     30, 50.0, 35.0, 28.0, 540.0, 360.0, 0.90],
+    [4, '', '', '', '',
+     '50102', '弹簧', '直径3mm', 50000, 0.15, 'HKD',
+     8, 40.0, 30.0, 20.0, 80.0, 50.0, 0.75],
+  ];
+
+  // 注意：不能在 headers 前加说明行，否则 sheet_to_json 会把它当成表头导致解析失败
+  // 详细说明放在第二个 sheet「字段说明」里
+  const aoa = [headers, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // 列宽
+  ws['!cols'] = cols.map(c => ({ wch: c[1] }));
+
+  // 合并单元格：示例中"供应商/采购单日期/采购单号/提单抬头"按 2 行一组合并
+  // XLSX merge 的行列均为 0-based；表头=row 0，数据从 row 1 开始
+  ws['!merges'] = [
+    // 第一组（数据行 1-2）合并 供应商/采购单日期/采购单号/提单抬头 列（B-E，列索引 1-4）
+    { s: { r: 1, c: 1 }, e: { r: 2, c: 1 } },
+    { s: { r: 1, c: 2 }, e: { r: 2, c: 2 } },
+    { s: { r: 1, c: 3 }, e: { r: 2, c: 3 } },
+    { s: { r: 1, c: 4 }, e: { r: 2, c: 4 } },
+    // 第二组（数据行 3-4）
+    { s: { r: 3, c: 1 }, e: { r: 4, c: 1 } },
+    { s: { r: 3, c: 2 }, e: { r: 4, c: 2 } },
+    { s: { r: 3, c: 3 }, e: { r: 4, c: 3 } },
+    { s: { r: 3, c: 4 }, e: { r: 4, c: 4 } },
+  ];
+
+  // 表头行样式（社区版 XLSX 对样式支持有限，部分客户端可能忽略）
+  for (let c = 0; c < headers.length; c++) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c });
+    if (ws[addr]) {
+      ws[addr].s = { fill: { fgColor: { rgb: 'FF2563EB' } }, font: { bold: true, color: { rgb: 'FFFFFFFF' } }, alignment: { horizontal: 'center' } };
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '采购单');
+
+  // 第二个 sheet：字段说明
+  const helpAoa = [
+    ['字段', '是否必填', '说明', '识别同义词（任意一个匹配即可）'],
+    ['货号', '✅ 必填', '与第三步表格中"货号"完全一致才会被填充', 'item no, itemno, 品号, 料号'],
+    ['产品中文名称', '推荐', '辅助模糊匹配（避免同货号但产品不同时误填）', '中文名称, 产品名称, 品名'],
+    ['送货数量', '可选', '自动填入"送货数量"列', '订单数量, 出货数, qty, 数量'],
+    ['采购单价', '可选', '自动填入"采购单价"列，并触发采购金额计算', '单价（港币）, purchase price'],
+    ['供应商', '可选', '支持合并单元格，下方空行会沿用上方值', '供货商, vendor'],
+    ['采购单日期', '可选', '支持合并单元格', 'date of purchase order, po date'],
+    ['采购单号', '可选', '支持合并单元格', 'po no, po number'],
+    ['提单抬头', '可选', '支持合并单元格', '甲方, bill of lading'],
+    ['箱数', '可选', '只取数字，若单元格含 50*40*30 等会作为尺寸提取', '总箱数, ctns, 件数'],
+    ['长/宽/高 (cm)', '可选', '推荐分三列填；若仅有"纸箱尺寸"列也可识别 50*40*30 格式', '纸箱尺寸, 长宽高, l*w*h, dimensions'],
+    ['毛重总重', '可选', 'kg', '总毛重, gross weight'],
+    ['净重总重', '可选', 'kg', '总净重, net weight'],
+    ['纸箱重量(kg)', '可选', '空箱重量，参与毛重计算', '箱重, carton weight'],
+    ['币种', '可选', '默认 HKD', 'currency, 货币, 币别'],
+  ];
+  const wsHelp = XLSX.utils.aoa_to_sheet(helpAoa);
+  wsHelp['!cols'] = [{ wch: 16 }, { wch: 10 }, { wch: 50 }, { wch: 50 }];
+  XLSX.utils.book_append_sheet(wb, wsHelp, '字段说明');
+
+  XLSX.writeFile(wb, '采购单导入模板.xlsx');
+}
+
+// ============================================================
+//  INIT
+// ============================================================
+initDefaultData();
+goStep(1);
+</script>
+</body>
+</html>
