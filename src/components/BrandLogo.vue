@@ -1,8 +1,12 @@
 <script setup>
+import { useId } from 'vue'
+
 defineProps({
   size: { type: Number, default: 40 },
   showText: { type: Boolean, default: false },
 })
+
+const gradId = useId()
 </script>
 
 <template>
@@ -16,12 +20,12 @@ defineProps({
       aria-label="RR 华登河源工具门户"
     >
       <defs>
-        <linearGradient id="rrGrad" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient :id="gradId" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stop-color="#34d399" />
           <stop offset="1" stop-color="#10B981" />
         </linearGradient>
       </defs>
-      <circle cx="20" cy="20" r="20" fill="url(#rrGrad)" />
+      <circle cx="20" cy="20" r="20" :fill="`url(#${gradId})`" />
       <text
         x="50%"
         y="53%"
