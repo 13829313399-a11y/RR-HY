@@ -1,0 +1,24 @@
+services:
+  # 门户前端（Vue3 + Vite 打包后用 nginx 托管）
+  portal:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rr-heyuan-portal
+    container_name: rr-heyuan-portal
+    ports:
+      - "80:80"          # 主机 80 端口 -> 容器 80 端口；正式版可改成 "8080:80" 等
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ───────── 将来加「需要后台的工具」时，在这下面加 service ─────────
+  # 例如某个工具要 Node 后台 + 数据库，就这样加：
+  # some-tool-api:
+  #   build: ./apps/some-tool
+  #   restart: unless-stopped
+  #   expose:
+  #     - "3000"

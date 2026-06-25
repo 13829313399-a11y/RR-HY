@@ -1,0 +1,13 @@
+# 构建镜像时排除这些，避免拷进容器、加快构建
+node_modules
+dist
+.git
+.gitignore
+.vscode
+.idea
+*.log
+README.md
+deploy.sh
+Dockerfile
+docker-compose.yml
+.dockerignore
